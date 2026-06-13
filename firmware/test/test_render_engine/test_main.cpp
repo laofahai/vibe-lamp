@@ -70,6 +70,28 @@ void test_error_flashes_then_settles() {
   TEST_ASSERT_LESS_THAN_UINT8(40, after.r);
 }
 
+void test_two_sessions_split_ring() {
+  Rgb leds[16];
+  Session ss[2] = {
+    mk(State::WORKING, ToolKind::CODE),   // 蓝
+    mk(State::NEEDS_YOU)                   // 红
+  };
+  ss[0].state_since_ms = 0; ss[1].state_since_ms = 0;
+  render(ss, 2, 0, leds, 16);
+  // 前 8 颗偏蓝，后 8 颗偏红
+  TEST_ASSERT_GREATER_THAN_UINT8(leds[0].r, leds[0].b);
+  TEST_ASSERT_GREATER_THAN_UINT8(leds[15].b, leds[15].r);
+}
+
+void test_single_session_fills_all() {
+  Rgb leds[16];
+  Session s = mk(State::WORKING, ToolKind::CODE);
+  s.state_since_ms = 0;
+  render(&s, 1, 0, leds, 16);
+  for (int i = 0; i < 16; ++i)
+    TEST_ASSERT_GREATER_THAN_UINT8(leds[i].r, leds[i].b);  // 全蓝
+}
+
 void setUp() {} void tearDown() {}
 
 int main() {
@@ -81,5 +103,7 @@ int main() {
   RUN_TEST(test_needs_you_blinks_off);
   RUN_TEST(test_done_fades_out);
   RUN_TEST(test_error_flashes_then_settles);
+  RUN_TEST(test_two_sessions_split_ring);
+  RUN_TEST(test_single_session_fills_all);
   return UNITY_END();
 }

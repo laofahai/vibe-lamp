@@ -73,6 +73,15 @@ void render(const Session* sessions, uint8_t session_count,
     for (uint8_t i = 0; i < num_leds; ++i) out[i] = Rgb{0,0,0};
     return;
   }
-  Rgb c = animated_color(sessions[0], now_ms);
-  for (uint8_t i = 0; i < num_leds; ++i) out[i] = c;
+  if (session_count == 1 || num_leds == 1) {
+    Rgb c = animated_color(sessions[0], now_ms);
+    for (uint8_t i = 0; i < num_leds; ++i) out[i] = c;
+    return;
+  }
+  // 多会话：均分像素段，每段一个会话（最多 num_leds 个会话）
+  uint8_t shown = session_count < num_leds ? session_count : num_leds;
+  for (uint8_t i = 0; i < num_leds; ++i) {
+    uint8_t seg = (uint16_t)i * shown / num_leds;   // i 落在哪段
+    out[i] = animated_color(sessions[seg], now_ms);
+  }
 }
