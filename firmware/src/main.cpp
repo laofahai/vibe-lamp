@@ -33,7 +33,7 @@ void setup() {
   if (net_begin())
     Serial.printf("WiFi OK, http://%s.local  IP=%s\n", MDNS_HOST, WiFi.localIP().toString().c_str());
   else
-    Serial.println("WiFi FAILED (检查 secrets.h)");
+    Serial.println("WiFi 未连接（长按 BOOT 键 3s 或访问 /reset 重新配网）");
   api_begin();
 }
 
