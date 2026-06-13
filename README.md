@@ -3,7 +3,9 @@
 > AI 编码状态实体氛围灯 —— 把 Claude Code / Codex 会话的实时状态做成一盏桌面氛围灯。
 > 余光一瞥就知道 AI 在干活、干完了、还是卡住要你介入，不用盯着屏幕。
 
-**蓝 = 干活中 · 绿 = 完成 · 红 = 要你介入。** 它是 [Vibe Island](https://vibeisland.app/)（macOS 刘海/菜单栏面板）的「实体灯版」：同样的状态，搬到桌上一盏看得见的灯上。
+**蓝 = 干活中 · 绿 = 完成 · 红 = 要你介入。** 它的灵感来自 [Vibe Island](https://vibeisland.app/)（macOS 刘海/菜单栏面板）——把同样的状态搬到桌上一盏看得见的灯上，可以说是它的「实体灯版」。
+
+> **但不依赖、也无需安装 Vibe Island。** Vibe Lamp 直接读各 agent 自己的钩子（Claude Code `~/.claude/settings.json`、Codex `~/.codex/hooks.json`）拿状态，和 Vibe Island 是各自独立的「钩子消费者」。两者可以共存（钩子会各跑各的），也可以只装其一。
 
 ---
 
