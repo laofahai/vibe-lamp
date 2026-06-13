@@ -4,6 +4,7 @@
 #include "api_server.h"
 #include "render_engine.h"
 #include "settings_store.h"
+#include "net.h"
 
 static WebServer server(HTTP_PORT);
 static Session g_sessions[NUM_LEDS > 8 ? NUM_LEDS : 8];
@@ -147,12 +148,20 @@ static void handle_root() {
   server.send_P(200, "text/html", SETTINGS_HTML);
 }
 
+// —— 软件触发重配网：清 NVS 凭据后重启进配网门户 ——
+static void handle_reset() {
+  server.send(200, "text/plain", "resetting wifi, rebooting into setup portal");
+  delay(200);
+  net_reset_and_reboot();    // 来自 net.h
+}
+
 void api_begin() {
   server.on("/", HTTP_GET, handle_root);
   server.on("/settings", HTTP_GET, handle_get_settings);
   server.on("/settings", HTTP_POST, handle_post_settings);
   server.on("/state", HTTP_POST, handle_state);
   server.on("/health", HTTP_GET, handle_health);
+  server.on("/reset", HTTP_GET, handle_reset);
   server.begin();
 }
 void api_loop() { server.handleClient(); }
