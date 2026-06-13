@@ -29,10 +29,11 @@ static ToolKind parse_tool(const char* t) {
   return ToolKind::NONE;
 }
 
-static void handle_state() {
+// 解析 /state 同款 JSON → 写入会话表 + 刷新看门狗。HTTP 与 BLE 共用此函数。
+bool api_apply_state_json(const char* json, size_t len) {
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, server.arg("plain"));
-  if (err) { server.send(400, "text/plain", "bad json"); return; }
+  DeserializationError err = deserializeJson(doc, json, len);
+  if (err) return false;
 
   JsonArray arr = doc["sessions"].as<JsonArray>();
   uint8_t cap = sizeof(g_sessions) / sizeof(g_sessions[0]);
@@ -54,8 +55,16 @@ static void handle_state() {
     ++n;
   }
   g_count = n;
-  g_last_ms = now;
-  server.send(200, "application/json", "{\"ok\":true}");
+  g_last_ms = now;          // 重置看门狗：BLE 收到也算「有人在喂」
+  return true;
+}
+
+static void handle_state() {
+  String body = server.arg("plain");
+  if (api_apply_state_json(body.c_str(), body.length()))
+    server.send(200, "application/json", "{\"ok\":true}");
+  else
+    server.send(400, "text/plain", "bad json");
 }
 
 static void handle_health() {

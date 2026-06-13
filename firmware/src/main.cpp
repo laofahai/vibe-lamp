@@ -6,6 +6,7 @@
 #include "net.h"
 #include "api_server.h"
 #include "settings_store.h"
+#include "ble_state.h"
 
 static Rgb g_pixels[NUM_LEDS];
 
@@ -35,6 +36,11 @@ void setup() {
   else
     Serial.println("WiFi 未连接（长按 BOOT 键 3s 或访问 /reset 重新配网）");
   api_begin();
+
+#ifdef ENABLE_BLE
+  ble_state_begin();
+  Serial.println("BLE 状态兜底服务已启动（设备名 VibeLamp）");
+#endif
 }
 
 void loop() {

@@ -51,3 +51,9 @@
 // 用板载 BOOT 按钮（多数 ESP32 开发板 = GPIO0，已接上拉，按下拉低）
 #define PIN_RESET_BTN      0
 #define RESET_HOLD_MS      3000UL             // 开机时长按 3s 触发重配网
+
+// —— BLE 状态推送服务（Part B②，与配网无关，可与 WiFi 共存）——
+// 仅在编译开 -DENABLE_BLE 时生效（独立 env:esp32_ble）；默认构建不含 BLE。
+#define BLE_STATE_DEVICE_NAME  "VibeLamp"
+#define BLE_STATE_SERVICE_UUID "6e6c0001-b5a3-f393-e0a9-e50e24dcca9e"
+#define BLE_STATE_CHAR_UUID    "6e6c0002-b5a3-f393-e0a9-e50e24dcca9e"
