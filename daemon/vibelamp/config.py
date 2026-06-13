@@ -1,51 +1,53 @@
+"""守护进程配置。
+
+取值优先级（高 → 低）：**环境变量 > ~/.vibelamp/config.json > 内置默认值**。
+
+运行期可配字段（灯地址、推送超时、心跳间隔、会话超时、BLE 兜底等）统一经
+`load_config()` 解析，再回填为模块级常量供各模块读取。守护进程长跑，config.json
+改动需重启守护进程生效（不做热重载，符合 HARDWARE.md 的「编辑后重启生效」约定）。
+
+环境变量保留覆盖能力：即便 config.json 写了某字段，设了对应环境变量仍以环境变量为准。
+"""
+import json
 import os
-
-# 灯的状态端点（macOS 原生解析 .local）
-LAMP_URL = os.environ.get("VIBELAMP_URL", "http://vibelamp.local/state")
-# 守护进程监听（钩子 curl 的目标）
-LISTEN_HOST = "127.0.0.1"
-LISTEN_PORT = int(os.environ.get("VIBELAMP_PORT", "8787"))
-# 心跳与超时
-HEARTBEAT_SEC = 5.0          # 每 5s 重推（兼做灯重启自愈）
-PUSH_TIMEOUT_SEC = 1.0       # 推送灯的超时
-SESSION_TTL_SEC = 1800       # 30min 无活动的死会话兜底清理
-
 from pathlib import Path
 
-# —— BLE 兜底桥接（计划 04 Part B②，可选；默认关闭）——
-# WiFi HTTP push 失败时，是否把同款 wire JSON 经本地 Unix socket 投给常驻 BLE 桥接进程。
-# 默认 False —— 不启用即维持原有 WiFi-only 行为（现有测试与默认行为不变）。
-BLE_FALLBACK_ENABLED = os.environ.get("VIBELAMP_BLE", "0") == "1"
-# 灯的 BLE 设备名（须与固件 BLE_STATE_DEVICE_NAME 一致）
-BLE_DEVICE_NAME = "VibeLamp"
-# 灯的 BLE 状态服务/特征 UUID（须与固件 ble_state.* 一致）
-BLE_SERVICE_UUID = "6e6c0001-b5a3-f393-e0a9-e50e24dcca9e"
-BLE_CHAR_UUID = "6e6c0002-b5a3-f393-e0a9-e50e24dcca9e"
-# 守护进程 → BLE 桥接进程 的本地通道（Unix domain socket 路径）
-BLE_BRIDGE_SOCKET = os.environ.get(
-    "VIBELAMP_BLE_SOCK",
-    str(Path.home() / ".vibelamp" / "ble_bridge.sock"))
-# BLE 桥接扫描灯的超时（秒）
-BLE_SCAN_TIMEOUT_SEC = 8.0
+# —— 固定（非运行期可配）——
+# 守护进程监听地址（钩子 curl 的目标，固定回环）
+LISTEN_HOST = "127.0.0.1"
 
 # —— Codex 配置文件路径 ——
 CODEX_DIR = Path.home() / ".codex"
 CODEX_HOOKS_JSON = CODEX_DIR / "hooks.json"     # sidecar 纯 JSON 钩子文件
 CODEX_CONFIG_TOML = CODEX_DIR / "config.toml"   # 仅追加 hooks 指针注释 + notify 一行
 
-import json
+# 灯的 BLE 状态服务/特征 UUID（须与固件 ble_state.* 一致；属硬件契约，不走 config.json）
+BLE_SERVICE_UUID = "6e6c0001-b5a3-f393-e0a9-e50e24dcca9e"
+BLE_CHAR_UUID = "6e6c0002-b5a3-f393-e0a9-e50e24dcca9e"
+# BLE 桥接扫描灯的超时（秒）
+BLE_SCAN_TIMEOUT_SEC = 8.0
 
 CONFIG_PATH = Path.home() / ".vibelamp" / "config.json"
 
+# —— 内置默认值（纯默认，不含环境变量）——
+# config.json 缺失/缺项时回落到这里；install.py 也据此生成默认配置文件。
 _DEFAULTS = {
-    "lamp_url": LAMP_URL,
-    "listen_port": LISTEN_PORT,
-    "heartbeat_sec": HEARTBEAT_SEC,
-    "session_ttl_sec": SESSION_TTL_SEC,
+    # 灯的状态端点（macOS 原生解析 .local）
+    "lamp_url": "http://vibelamp.local/state",
+    # 守护进程监听端口（钩子 curl 的目标）
+    "listen_port": 8787,
+    # 心跳间隔（秒）：每 5s 重推（兼做灯重启自愈）
+    "heartbeat_sec": 5.0,
+    # 推送灯的超时（秒）
+    "push_timeout_sec": 1.0,
+    # 无活动多久算死会话（秒）：30min 兜底清理
+    "session_ttl_sec": 1800,
     # BLE 兜底桥接（默认关闭，确保现有 WiFi-only 行为不变）
-    "ble_fallback_enabled": BLE_FALLBACK_ENABLED,
-    "ble_bridge_socket": BLE_BRIDGE_SOCKET,
-    "ble_device_name": BLE_DEVICE_NAME,
+    "ble_fallback_enabled": False,
+    # 守护进程 → BLE 桥接进程 的本地通道（Unix domain socket 路径）
+    "ble_bridge_socket": str(Path.home() / ".vibelamp" / "ble_bridge.sock"),
+    # 灯的 BLE 设备名（须与固件 BLE_STATE_DEVICE_NAME 一致）
+    "ble_device_name": "VibeLamp",
     # Claude 工具名 → code/command/search（覆盖计划02/03硬编码默认）
     "claude_tool_map": {
         "Edit": "code", "Write": "code", "MultiEdit": "code", "NotebookEdit": "code",
@@ -55,9 +57,40 @@ _DEFAULTS = {
     },
 }
 
+# —— 环境变量覆盖映射 ——
+# 键 = config.json/默认值 字段名；值 = (环境变量名, 解析函数)。
+# 设了环境变量则以其为准（优先级最高），未设则用 config.json / 默认值。
+def _as_bool(v):
+    return str(v).strip() == "1"
+
+
+_ENV_OVERRIDES = {
+    "lamp_url": ("VIBELAMP_URL", str),
+    "listen_port": ("VIBELAMP_PORT", int),
+    "ble_fallback_enabled": ("VIBELAMP_BLE", _as_bool),
+    "ble_bridge_socket": ("VIBELAMP_BLE_SOCK", str),
+}
+
+
+def _apply_env_overrides(cfg):
+    """把已生效的环境变量覆盖进 cfg（环境变量优先级最高）。坏值忽略、不崩。"""
+    for key, (env_name, parse) in _ENV_OVERRIDES.items():
+        raw = os.environ.get(env_name)
+        if raw is None:
+            continue
+        try:
+            cfg[key] = parse(raw)
+        except Exception:
+            pass        # 环境变量值解析失败 → 忽略，保留 file/默认值
+    return cfg
+
 
 def load_config():
-    """读 ~/.vibelamp/config.json 覆盖默认；缺失/坏文件回落默认，不崩。"""
+    """解析最终配置：内置默认 ← config.json ← 环境变量（环境变量优先）。
+
+    缺失/坏文件回落默认，不崩。每次调用都重读 CONFIG_PATH（守护进程在启动时经
+    apply_config() 读一次并缓存到模块级常量，运行期不反复调用此函数）。
+    """
     cfg = dict(_DEFAULTS)
     try:
         if CONFIG_PATH.exists():
@@ -66,4 +99,31 @@ def load_config():
                 cfg.update({k: v for k, v in user.items() if v is not None})
     except Exception:
         pass
+    _apply_env_overrides(cfg)
     return cfg
+
+
+def apply_config():
+    """重新解析配置并回填模块级常量，供运行期各模块读取。
+
+    模块导入时调用一次（见文件末尾）；改了 CONFIG_PATH / 环境变量后可再调以刷新
+    （主要给测试与显式刷新用）。返回最新的配置字典。
+    """
+    global LAMP_URL, LISTEN_PORT, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
+    global BLE_FALLBACK_ENABLED, BLE_BRIDGE_SOCKET, BLE_DEVICE_NAME
+    cfg = load_config()
+    LAMP_URL = cfg["lamp_url"]
+    LISTEN_PORT = cfg["listen_port"]
+    HEARTBEAT_SEC = cfg["heartbeat_sec"]
+    PUSH_TIMEOUT_SEC = cfg["push_timeout_sec"]
+    SESSION_TTL_SEC = cfg["session_ttl_sec"]
+    BLE_FALLBACK_ENABLED = cfg["ble_fallback_enabled"]
+    BLE_BRIDGE_SOCKET = cfg["ble_bridge_socket"]
+    BLE_DEVICE_NAME = cfg["ble_device_name"]
+    return cfg
+
+
+# 模块导入时解析一次，回填下列模块级常量（运行期各模块直接读这些常量）：
+#   LAMP_URL / LISTEN_PORT / HEARTBEAT_SEC / PUSH_TIMEOUT_SEC / SESSION_TTL_SEC /
+#   BLE_FALLBACK_ENABLED / BLE_BRIDGE_SOCKET / BLE_DEVICE_NAME
+apply_config()

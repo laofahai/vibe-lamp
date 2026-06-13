@@ -175,7 +175,7 @@ vibe-lamp/
 ├── README.zh-CN.md            # 本文件(中文)
 ├── HARDWARE.md                # 今晚照着做的硬件上手指南
 ├── firmware/                  # ESP32 固件(PlatformIO)
-│   ├── platformio.ini         #   env:esp32 / esp32_ring / native
+│   ├── platformio.ini         #   env:esp32 / esp32_ring / esp32_ble / native
 │   ├── include/config.h       #   引脚、灯数、超时、mDNS 名、亮度上限
 │   ├── src/                   #   渲染引擎 + 显示驱动 + 网络 + HTTP API
 │   └── test/                  #   渲染引擎 native 单测
@@ -197,3 +197,9 @@ vibe-lamp/
 - **寻址**:mDNS `vibelamp.local`(macOS 原生解析,无需额外软件)。
 
 设计文档:[superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
+
+---
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE) —— 可自由使用、修改与分发。

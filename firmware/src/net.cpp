@@ -10,6 +10,9 @@ static WiFiManager wm;
 static void start_mdns() {
   if (MDNS.begin(MDNS_HOST)) {              // → vibelamp.local
     MDNS.addService("http", "tcp", HTTP_PORT);
+  } else {
+    // 注册失败时给出提示，否则用户访问 vibelamp.local 失败时毫无头绪。
+    Serial.println("[警告] mDNS 注册失败，请改用 IP 地址访问设备");
   }
 }
 

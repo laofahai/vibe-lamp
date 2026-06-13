@@ -55,7 +55,8 @@ Vibe Island 是一款 macOS 刘海/菜单栏面板，把 Claude Code、Codex 等
 | `SessionStart` | 会话开始 |
 | `UserPromptSubmit` | 用户提交指令 → 开始干活 |
 | `PreToolUse` | 即将调用工具（payload 带工具名）→ 干活中 + 心跳 |
-| `PostToolUse` | 工具完成（payload 带工具名、是否报错）→ 出错检测 |
+| `PostToolUse` | 工具完成（payload 带工具名）→ 干活推进 |
+| `PostToolUseFailure` | 工具调用失败 → 出错 |
 | `Notification` | 需要权限/注意 → 要你介入 |
 | `Stop` | 主回合结束 → 完成 |
 | `SessionEnd` | 会话结束 → 空闲 |
@@ -117,7 +118,7 @@ Vibe Island 是一款 macOS 刘海/菜单栏面板，把 Claude Code、Codex 等
 | 💓 推进一步 | 每次工具调用一个**跳动脉冲**（pulse；区别于 §6 的网络心跳 heartbeat） | PreToolUse |
 | 🟢 完成 | 绿亮 3-5 秒 → **渐暗**回空闲 | Stop / agent-turn-complete |
 | 🔴 要你介入 | 红**慢闪** | Notification / approval-requested |
-| ⚡ 出错 | 红**快闪一下** → 弹回干活色 | PostToolUse 报错 |
+| ⚡ 出错 | 红**快闪一下** → 弹回干活色 | PostToolUseFailure / Codex tool_response.exit_code≠0 |
 | 🟠 失联 | 暗琥珀/白**慢呼吸**（明显区别于以上各色） | 看门狗 ~30s 没收到消息 |
 | 🚀 开机 | 上电跑个扫描动画 | SessionStart / 上电 |
 
