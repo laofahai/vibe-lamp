@@ -49,3 +49,55 @@ def remove_hooks(settings):
             del hooks[ev]
     settings["hooks"] = hooks
     return settings
+
+
+def _load_settings():
+    if SETTINGS.exists():
+        return json.loads(SETTINGS.read_text() or "{}")
+    return {}
+
+
+def _save_settings(settings):
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
+
+
+def _write_plist():
+    daemon_dir = str(Path(__file__).resolve().parent)
+    log_dir = str(Path.home() / "Library" / "Logs")
+    tmpl = (Path(daemon_dir) / "com.vibelamp.daemon.plist.template").read_text()
+    PLIST.parent.mkdir(parents=True, exist_ok=True)
+    PLIST.write_text(tmpl.format(
+        PYTHON=sys.executable, DAEMON_DIR=daemon_dir, LOG_DIR=log_dir))
+
+
+def _launchctl(*args):
+    subprocess.run(["launchctl", *args], check=False)
+
+
+def install():
+    _save_settings(merge_hooks(_load_settings()))
+    print(f"✅ 钩子已写入 {SETTINGS}")
+    _write_plist()
+    _launchctl("unload", str(PLIST))      # 先卸（忽略报错）
+    _launchctl("load", "-w", str(PLIST))
+    print(f"✅ launchd 已加载 {PLIST}（开机自启 + 崩溃重拉）")
+
+
+def uninstall():
+    _launchctl("unload", str(PLIST))
+    if PLIST.exists():
+        PLIST.unlink()
+    _save_settings(remove_hooks(_load_settings()))
+    print("✅ 已移除钩子与 launchd")
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "install"
+    if cmd == "install":
+        install()
+    elif cmd == "uninstall":
+        uninstall()
+    else:
+        print("用法: python install.py [install|uninstall]")
+        sys.exit(1)

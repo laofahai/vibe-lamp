@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.vibelamp.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{PYTHON}</string>
+    <string>-m</string>
+    <string>vibelamp</string>
+  </array>
+  <key>WorkingDirectory</key><string>{DAEMON_DIR}</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PYTHONPATH</key><string>{DAEMON_DIR}</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>{LOG_DIR}/vibelamp.out.log</string>
+  <key>StandardErrorPath</key><string>{LOG_DIR}/vibelamp.err.log</string>
+</dict>
+</plist>
