@@ -41,3 +41,13 @@
 
 // —— 亮度上限（保护眼睛/限流）——
 #define MAX_BRIGHTNESS 160
+
+// —— 网页配网（WiFiManager）——
+#define PROV_AP_NAME       "VibeLamp-Setup"   // 配网热点 SSID
+#define PROV_AP_PASS       ""                 // 空 = 开放热点（家用够用；要加密改成 >=8 位）
+#define PROV_PORTAL_TIMEOUT 180               // 配网门户超时（秒）；超时后退出门户继续 loop
+
+// —— 重配网按钮（开机长按触发 resetSettings + 重开门户）——
+// 用板载 BOOT 按钮（多数 ESP32 开发板 = GPIO0，已接上拉，按下拉低）
+#define PIN_RESET_BTN      0
+#define RESET_HOLD_MS      3000UL             // 开机时长按 3s 触发重配网
