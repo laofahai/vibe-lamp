@@ -5,6 +5,7 @@
 #include "display.h"
 #include "net.h"
 #include "api_server.h"
+#include "settings_store.h"
 
 static Rgb g_pixels[NUM_LEDS];
 
@@ -12,6 +13,7 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   display().begin();
+  render_set_settings(settings_load());   // 从 NVS 恢复用户设置
   if (net_begin())
     Serial.printf("WiFi OK, http://%s.local  IP=%s\n", MDNS_HOST, WiFi.localIP().toString().c_str());
   else

@@ -9,7 +9,7 @@ class Ws2812Display : public IDisplay {
 public:
   void begin() override {
     FastLED.addLeds<WS2812B, PIN_WS2812, GRB>(g_leds, NUM_LEDS);
-    FastLED.setBrightness(MAX_BRIGHTNESS);
+    FastLED.setBrightness(255);   // 亮度交渲染层统一施加
   }
   void show(const Rgb* px, uint8_t n) override {
     for (uint8_t i = 0; i < n; ++i) g_leds[i] = CRGB(px[i].r, px[i].g, px[i].b);

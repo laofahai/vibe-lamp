@@ -21,10 +21,10 @@ public:
     ledcAttachPin(PIN_RGB_B, LEDC_CH_B);
   }
   void show(const Rgb* px, uint8_t /*n*/) override {
-    // 共阴：duty 直接给值；亮度上限保护
-    ledcWrite(LEDC_CH_R, (px[0].r * MAX_BRIGHTNESS) / 255);
-    ledcWrite(LEDC_CH_G, (px[0].g * MAX_BRIGHTNESS) / 255);
-    ledcWrite(LEDC_CH_B, (px[0].b * MAX_BRIGHTNESS) / 255);
+    // 共阴：duty 直接给值；亮度已在渲染层统一施加，此处不再二次缩放
+    ledcWrite(LEDC_CH_R, px[0].r);
+    ledcWrite(LEDC_CH_G, px[0].g);
+    ledcWrite(LEDC_CH_B, px[0].b);
   }
 };
 
