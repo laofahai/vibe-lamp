@@ -21,6 +21,7 @@ Rgb working_color(ToolKind t) {
 
 // 三角波 0..255，period 毫秒
 uint8_t tri_wave(uint32_t elapsed, uint32_t period) {
+  if (period < 2) return 0;                        // 防御除零：period 为 0/1 时 half=0
   uint32_t p = elapsed % period;
   uint32_t half = period / 2;
   uint32_t up = (p < half) ? p : (period - p);     // 0..half
@@ -28,6 +29,7 @@ uint8_t tri_wave(uint32_t elapsed, uint32_t period) {
 }
 // 方波：前半周期 255，后半 0
 uint8_t square_wave(uint32_t elapsed, uint32_t period) {
+  if (period < 2) return 0;                        // 防御除零：period 为 0 时取模会崩
   return (elapsed % period) < (period / 2) ? 255 : 0;
 }
 Rgb scale(Rgb c, uint8_t b) {
