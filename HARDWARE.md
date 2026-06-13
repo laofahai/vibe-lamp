@@ -233,11 +233,11 @@ http://vibelamp.local/
 ### 连不上 WiFi / 想重新配网
 - 设备始终连不上、或换了路由器：让它重进配网门户，两种办法任选：
   - **开机长按按钮**：断电 → 按住板载 **BOOT 键**（GPIO0）→ 上电并保持约 **3 秒** → 串口打印「重置 WiFi 凭据」并重启 → 重新出现 `VibeLamp-Setup` 热点，按第 3 节重配一次。
-  - **HTTP 软触发**（设备还在线时）：浏览器打开或执行
+  - **HTTP 软触发**（设备还在线时）：执行
     ```bash
-    curl http://vibelamp.local/reset
+    curl -X POST http://vibelamp.local/reset
     ```
-    设备清掉旧凭据后重启进配网门户。
+    设备清掉旧凭据后重启进配网门户。（用 POST 而非浏览器直接打开，避免被恶意网页的 `<img src>` 等误触发清网。）
 - 配网门户超时（约 3 分钟没人配）会自动退出继续运行，此时灯进失联态——重新触发配网即可。
 
 ### 灯不亮，查什么
@@ -266,4 +266,4 @@ http://vibelamp.local/
 
 ## 8. 换网 / 搬家
 
-不用重烧、不用拆机：按上面「重新配网」的**开机长按 BOOT 键 3 秒**或 `curl http://vibelamp.local/reset`，清掉旧凭据重进 `VibeLamp-Setup` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。
+不用重烧、不用拆机：按上面「重新配网」的**开机长按 BOOT 键 3 秒**或 `curl -X POST http://vibelamp.local/reset`，清掉旧凭据重进 `VibeLamp-Setup` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。

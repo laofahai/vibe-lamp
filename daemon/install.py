@@ -57,8 +57,17 @@ def _load_settings():
     return {}
 
 
+def _backup_once(path):
+    """首次改写用户文件前留一份 .vibelamp-bak 备份（已存在则不覆盖，保留最早原貌）。"""
+    if path.exists():
+        bak = path.with_name(path.name + ".vibelamp-bak")
+        if not bak.exists():
+            bak.write_text(path.read_text())
+
+
 def _save_settings(settings):
     SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    _backup_once(SETTINGS)
     SETTINGS.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
 
 
@@ -178,8 +187,9 @@ def ensure_codex_toml_lines(text):
             "# 检测到用户已配置通知命令，vibelamp 不覆盖；",
             "# Codex 状态已通过 ~/.codex/hooks.json 的钩子推送给守护进程。",
             _TOML_END]) + "\n"
-    sep = "" if text.endswith("\n") or text == "" else "\n"
-    return text + sep + "\n" + block
+    # 放到文件最前面：TOML 根键（notify）必须在所有 [table] 之前，
+    # 否则追加到末尾会被当成最后那个表的子键而失效。
+    return block + text
 
 
 def strip_codex_toml_lines(text):
@@ -216,12 +226,14 @@ def _load_codex_hooks():
 
 def _install_codex():
     CODEX_HOOKS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    _backup_once(CODEX_HOOKS_JSON)
     merged = merge_codex_hooks(_load_codex_hooks())
     CODEX_HOOKS_JSON.write_text(json.dumps(merged, indent=2, ensure_ascii=False))
     print(f"✅ Codex 钩子已写入 {CODEX_HOOKS_JSON}")
+    _backup_once(CODEX_CONFIG_TOML)
     toml_text = ensure_codex_toml_lines(_read_text_or_empty(CODEX_CONFIG_TOML))
     CODEX_CONFIG_TOML.write_text(toml_text)
-    print(f"✅ Codex config.toml 已追加 notify（{CODEX_CONFIG_TOML}）")
+    print(f"✅ Codex config.toml 已写入 notify（置顶为根键）（{CODEX_CONFIG_TOML}）")
 
 
 def _uninstall_codex():
