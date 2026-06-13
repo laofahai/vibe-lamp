@@ -175,7 +175,7 @@ vibe-lamp/
 ├── README.zh-CN.md            # Chinese
 ├── HARDWARE.md                # The hardware getting-started guide to follow tonight
 ├── firmware/                  # ESP32 firmware (PlatformIO)
-│   ├── platformio.ini         #   envs: esp32 / esp32_ring / native
+│   ├── platformio.ini         #   envs: esp32 / esp32_ring / esp32_ble / native
 │   ├── include/config.h       #   pins, LED count, timeout, mDNS name, brightness cap
 │   ├── src/                   #   render engine + display driver + networking + HTTP API
 │   └── test/                  #   render-engine native unit tests
@@ -197,3 +197,9 @@ vibe-lamp/
 - **Addressing**: mDNS `vibelamp.local` (resolved natively by macOS, no extra software needed).
 
 Design doc: [superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE) — free to use, modify, and distribute.

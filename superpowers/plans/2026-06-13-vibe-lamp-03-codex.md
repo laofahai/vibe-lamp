@@ -40,7 +40,7 @@
 
 **两个仍存在不确定的点（本计划必须靠「先抓真实 payload/真实文件」兜底，不硬赌）：**
 1. **`hooks.json` 顶层结构有冲突**：官方 `config-advanced` 页读出来是「事件名直接做顶层 key」（`{"PreToolUse":[...]}`）；社区详解指南读出来是「裹在 `hooks` key 下」（`{"hooks":{"PreToolUse":[...]}}`，与 Claude `settings.json` 同形）。**两份权威说法不一致**。本计划默认采用**裹 `hooks` key** 的写法（更细的第三方指南给了完整最小示例，且与 Claude 侧对称、合并逻辑可复用思路），但 `Task 5` 必须先用一次真实 `codex` 安装核对 `~/.codex/hooks.json` 实际被接受的结构，再锁定。merge 函数写成**容错读两种形状**。
-2. **PostToolUse 没有独立的成功/失败事件**（Claude 侧我们在计划 02 造了个 `PostToolUseFailure` 虚拟名，Codex 没有）。Codex 的失败只能从 `tool_response.exit_code != 0` 推断。具体 `exit_code` 在 `tool_response` 里的确切层级（顶层还是嵌套、键名是不是就叫 `exit_code`）**未 100% 确认**，`Task 5` 抓真实 PostToolUse payload 时一并核对，normalize 的 Codex 分支对它做多候选兜底取值。
+2. **Codex 的 PostToolUse 没有独立的成功/失败事件**（Claude Code 侧官方提供了真实的 `PostToolUseFailure` 事件——工具调用失败时触发，与 `PostToolUse` 并列，计划 02 正是用它判出错；Codex 没有对应事件）。Codex 的失败只能从 `tool_response.exit_code != 0` 推断。具体 `exit_code` 在 `tool_response` 里的确切层级（顶层还是嵌套、键名是不是就叫 `exit_code`）**未 100% 确认**，`Task 5` 抓真实 PostToolUse payload 时一并核对，normalize 的 Codex 分支对它做多候选兜底取值。
 
 ---
 
