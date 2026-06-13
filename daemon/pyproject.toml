@@ -2,6 +2,11 @@
 name = "vibelamp"
 version = "0.1.0"
 requires-python = ">=3.9"
+# 守护进程主链路仅用标准库，零运行时依赖。
+
+[project.optional-dependencies]
+# 仅 BLE 兜底桥接（ble_bridge.py）需要；WiFi 主链路不需要。
+ble = ["bleak>=0.21"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

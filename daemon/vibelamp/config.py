@@ -12,6 +12,22 @@ SESSION_TTL_SEC = 1800       # 30min 无活动的死会话兜底清理
 
 from pathlib import Path
 
+# —— BLE 兜底桥接（计划 04 Part B②，可选；默认关闭）——
+# WiFi HTTP push 失败时，是否把同款 wire JSON 经本地 Unix socket 投给常驻 BLE 桥接进程。
+# 默认 False —— 不启用即维持原有 WiFi-only 行为（现有测试与默认行为不变）。
+BLE_FALLBACK_ENABLED = os.environ.get("VIBELAMP_BLE", "0") == "1"
+# 灯的 BLE 设备名（须与固件 BLE_STATE_DEVICE_NAME 一致）
+BLE_DEVICE_NAME = "VibeLamp"
+# 灯的 BLE 状态服务/特征 UUID（须与固件 ble_state.* 一致）
+BLE_SERVICE_UUID = "6e6c0001-b5a3-f393-e0a9-e50e24dcca9e"
+BLE_CHAR_UUID = "6e6c0002-b5a3-f393-e0a9-e50e24dcca9e"
+# 守护进程 → BLE 桥接进程 的本地通道（Unix domain socket 路径）
+BLE_BRIDGE_SOCKET = os.environ.get(
+    "VIBELAMP_BLE_SOCK",
+    str(Path.home() / ".vibelamp" / "ble_bridge.sock"))
+# BLE 桥接扫描灯的超时（秒）
+BLE_SCAN_TIMEOUT_SEC = 8.0
+
 # —— Codex 配置文件路径 ——
 CODEX_DIR = Path.home() / ".codex"
 CODEX_HOOKS_JSON = CODEX_DIR / "hooks.json"     # sidecar 纯 JSON 钩子文件
@@ -26,6 +42,10 @@ _DEFAULTS = {
     "listen_port": LISTEN_PORT,
     "heartbeat_sec": HEARTBEAT_SEC,
     "session_ttl_sec": SESSION_TTL_SEC,
+    # BLE 兜底桥接（默认关闭，确保现有 WiFi-only 行为不变）
+    "ble_fallback_enabled": BLE_FALLBACK_ENABLED,
+    "ble_bridge_socket": BLE_BRIDGE_SOCKET,
+    "ble_device_name": BLE_DEVICE_NAME,
     # Claude 工具名 → code/command/search（覆盖计划02/03硬编码默认）
     "claude_tool_map": {
         "Edit": "code", "Write": "code", "MultiEdit": "code", "NotebookEdit": "code",
