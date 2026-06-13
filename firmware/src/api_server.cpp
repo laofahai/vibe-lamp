@@ -109,7 +109,10 @@ static void handle_post_settings() {
   RenderSettings s = render_get_settings();
   if (d["brightness"].is<int>()) s.brightness = (uint8_t)d["brightness"].as<int>();
   if (d["animations"].is<bool>()) s.animations = d["animations"].as<bool>();
-  if (d["speed_pct"].is<int>())  s.speed_pct = (uint8_t)d["speed_pct"].as<int>();
+  if (d["speed_pct"].is<int>()) {
+    int sp = d["speed_pct"].as<int>();
+    s.speed_pct = (uint8_t)(sp > 255 ? 255 : (sp < 1 ? 1 : sp));   // 钳到 1..255，防 uint8_t 回绕
+  }
   if (d["working_code"].is<const char*>())    s.col_working_code = unhex(d["working_code"].as<String>());
   if (d["working_command"].is<const char*>()) s.col_working_command = unhex(d["working_command"].as<String>());
   if (d["working_search"].is<const char*>())  s.col_working_search = unhex(d["working_search"].as<String>());
@@ -131,7 +134,7 @@ button{width:100%;padding:12px;margin-top:16px;font-size:16px}</style></head><bo
 <h2>Vibe Lamp 设置</h2>
 <label>亮度 <input id=brightness type=range min=0 max=255></label>
 <label>动画 <input id=animations type=checkbox></label>
-<label>动画速度% <input id=speed_pct type=number min=20 max=400></label>
+<label>动画速度% <input id=speed_pct type=number min=20 max=255></label>
 <label>干活·写码 <input id=working_code type=color></label>
 <label>干活·命令 <input id=working_command type=color></label>
 <label>干活·搜索 <input id=working_search type=color></label>
@@ -170,7 +173,7 @@ void api_begin() {
   server.on("/settings", HTTP_POST, handle_post_settings);
   server.on("/state", HTTP_POST, handle_state);
   server.on("/health", HTTP_GET, handle_health);
-  server.on("/reset", HTTP_GET, handle_reset);
+  server.on("/reset", HTTP_POST, handle_reset);   // POST，避免 <img src> 等 CSRF 误触清网
   server.begin();
 }
 void api_loop() { server.handleClient(); }
