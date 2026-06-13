@@ -1,4 +1,5 @@
 #include "render_engine.h"
+#include <stdint.h>
 
 namespace {
 // 各状态基准色
@@ -19,27 +20,59 @@ Rgb working_color(ToolKind t) {
   }
 }
 
-Rgb base_color(const Session& s) {
+// 三角波 0..255，period 毫秒
+uint8_t tri_wave(uint32_t elapsed, uint32_t period) {
+  uint32_t p = elapsed % period;
+  uint32_t half = period / 2;
+  uint32_t up = (p < half) ? p : (period - p);     // 0..half
+  return (uint8_t)((up * 255) / half);
+}
+// 方波：前半周期 255，后半 0
+uint8_t square_wave(uint32_t elapsed, uint32_t period) {
+  return (elapsed % period) < (period / 2) ? 255 : 0;
+}
+Rgb scale(Rgb c, uint8_t b) {
+  return Rgb{ (uint8_t)(c.r * b / 255),
+             (uint8_t)(c.g * b / 255),
+             (uint8_t)(c.b * b / 255) };
+}
+
+// 给单个会话算出「带动画的颜色」
+Rgb animated_color(const Session& s, uint32_t now_ms) {
+  uint32_t e = now_ms - s.state_since_ms;
   switch (s.state) {
-    case State::WORKING:  return working_color(s.tool);
-    case State::DONE:     return COL_DONE;
-    case State::NEEDS_YOU:return COL_NEEDS;
-    case State::ERROR:    return COL_ERROR;
-    case State::LOST:     return COL_LOST;
-    case State::BOOT:     return COL_BOOT;
+    case State::WORKING: {
+      uint8_t b = 60 + (uint8_t)((uint16_t)tri_wave(e, 2000) * 195 / 255); // 呼吸 60..255
+      return scale(working_color(s.tool), b);
+    }
+    case State::NEEDS_YOU:
+      return scale(COL_NEEDS, square_wave(e, 1200));      // 慢闪
+    case State::ERROR:
+      return e < 300 ? COL_ERROR : Rgb{0,0,0};            // 快闪一下
+    case State::DONE: {
+      if (e >= 4500) return Rgb{0,0,0};
+      uint8_t b = (uint8_t)(255 - (e * 255 / 4500));      // 渐暗
+      return scale(COL_DONE, b);
+    }
+    case State::LOST: {
+      uint8_t b = 20 + (uint8_t)((uint16_t)tri_wave(e, 3000) * 80 / 255); // 暗呼吸 20..100
+      return scale(Rgb{255,150,0}, b);
+    }
+    case State::BOOT:
+      return COL_BOOT;
     case State::IDLE:
-    default:              return COL_IDLE;
+    default:
+      return COL_IDLE;
   }
 }
 } // namespace
 
 void render(const Session* sessions, uint8_t session_count,
-           uint32_t /*now_ms*/, Rgb* out, uint8_t num_leds) {
+           uint32_t now_ms, Rgb* out, uint8_t num_leds) {
   if (session_count == 0) {
-    for (uint8_t i = 0; i < num_leds; ++i) out[i] = COL_IDLE;
+    for (uint8_t i = 0; i < num_leds; ++i) out[i] = Rgb{0,0,0};
     return;
   }
-  // Task 2 先只处理第一个会话，铺满全部像素（动画/分段后续任务加）
-  Rgb c = base_color(sessions[0]);
+  Rgb c = animated_color(sessions[0], now_ms);
   for (uint8_t i = 0; i < num_leds; ++i) out[i] = c;
 }
