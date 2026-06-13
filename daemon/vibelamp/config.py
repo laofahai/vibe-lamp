@@ -9,3 +9,10 @@ LISTEN_PORT = int(os.environ.get("VIBELAMP_PORT", "8787"))
 HEARTBEAT_SEC = 5.0          # 每 5s 重推（兼做灯重启自愈）
 PUSH_TIMEOUT_SEC = 1.0       # 推送灯的超时
 SESSION_TTL_SEC = 1800       # 30min 无活动的死会话兜底清理
+
+from pathlib import Path
+
+# —— Codex 配置文件路径 ——
+CODEX_DIR = Path.home() / ".codex"
+CODEX_HOOKS_JSON = CODEX_DIR / "hooks.json"     # sidecar 纯 JSON 钩子文件
+CODEX_CONFIG_TOML = CODEX_DIR / "config.toml"   # 仅追加 hooks 指针注释 + notify 一行
