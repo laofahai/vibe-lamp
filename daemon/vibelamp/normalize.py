@@ -17,7 +17,7 @@ def classify_tool(tool_name):
 def transition(event):
     """Claude Code 钩子 JSON → (session_id, state, tool)；返回 None 表示忽略。"""
     name = event.get("hook_event_name")
-    sid = event.get("session_id") or "default"
+    sid = "claude:" + (event.get("session_id") or "default")
     if name == "UserPromptSubmit":
         return (sid, "working", "none")
     if name in ("PreToolUse", "PostToolUse"):
