@@ -4,10 +4,9 @@
 #include "render_engine.h"
 #include "display.h"
 #include "net.h"
+#include "api_server.h"
 
 static Rgb g_pixels[NUM_LEDS];
-static Session g_session;           // 单会话（网络层接入前先写死自检）
-static bool g_has_session = false;
 
 void setup() {
   Serial.begin(115200);
@@ -17,18 +16,28 @@ void setup() {
     Serial.printf("WiFi OK, http://%s.local  IP=%s\n", MDNS_HOST, WiFi.localIP().toString().c_str());
   else
     Serial.println("WiFi FAILED (检查 secrets.h)");
-  // 自检：开机 2s BOOT，然后进入 WORKING 看呼吸
-  g_session = Session{ State::WORKING, ToolKind::CODE, millis(), 0 };
-  g_has_session = true;
-  Serial.println("VibeLamp display self-test: WORKING breathing");
+  api_begin();
 }
 
 void loop() {
+  api_loop();
   uint32_t now = millis();
-  if (g_has_session)
-    render(&g_session, 1, now, g_pixels, NUM_LEDS);
-  else
-    render(nullptr, 0, now, g_pixels, NUM_LEDS);
+
+  const Session* sessions = api_sessions();
+  uint8_t count = api_session_count();
+  uint32_t last = api_last_state_ms();
+
+  // 看门狗：从未收到过 / 超时未收到 → 失联（仅在 WiFi 已起来后才算失联）
+  bool stale = (last == 0) || (now - last > WATCHDOG_TIMEOUT_MS);
+
+  if (stale && net_connected()) {
+    Session lost{ State::LOST, ToolKind::NONE, /*since*/ (last? last+WATCHDOG_TIMEOUT_MS : 0), 0 };
+    render(&lost, 1, now, g_pixels, NUM_LEDS);
+  } else if (count == 0) {
+    render(nullptr, 0, now, g_pixels, NUM_LEDS);   // idle
+  } else {
+    render(sessions, count, now, g_pixels, NUM_LEDS);
+  }
   display().show(g_pixels, NUM_LEDS);
-  delay(16);   // ~60fps
+  delay(16);
 }
