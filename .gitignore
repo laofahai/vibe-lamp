@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# 编辑器
+.vscode/
+.idea/
+
+# Python（转译器，语言待定）
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PlatformIO / Arduino（ESP32 固件）
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+
+# 本地密钥/配置（不入库）
+secrets.h
+wifi_credentials.*
+*.local
