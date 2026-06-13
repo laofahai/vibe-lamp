@@ -1,17 +1,11 @@
 from .model import REMOVE
+from . import config as _config
 
-_CODE = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-_SEARCH = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "Agent", "Task"}
+_CLAUDE_MAP = _config.load_config()["claude_tool_map"]
 
 
 def classify_tool(tool_name):
-    if tool_name in _CODE:
-        return "code"
-    if tool_name == "Bash":
-        return "command"
-    if tool_name in _SEARCH:
-        return "search"
-    return "code"   # 默认归为写码色
+    return _CLAUDE_MAP.get(tool_name, "code")   # 缺省归写码色
 
 
 def transition(event):

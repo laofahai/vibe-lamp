@@ -101,3 +101,10 @@ def test_codex_alt_session_id_keys_fallback():
     # session_id 字段名未来若变体（thread_id/conversation_id），做兜底
     assert codex_transition({"hook_event_name": "Stop",
                              "thread_id": "t9"}) == ("codex:t9", "done", "none")
+
+
+def test_classify_tool_uses_config_map(monkeypatch):
+    from vibelamp import normalize
+    monkeypatch.setattr(normalize, "_CLAUDE_MAP", {"FooTool": "command"})
+    assert normalize.classify_tool("FooTool") == "command"
+    assert normalize.classify_tool("Unknown") == "code"   # 缺省仍 code
