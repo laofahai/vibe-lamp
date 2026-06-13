@@ -115,11 +115,11 @@
 
 ## 开发 / 测试
 
-**守护进程（Python，仅标准库 + pytest）：**
+**守护进程（Python，主链路仅标准库；BLE 兜底可选装 bleak）：**
 
 ```bash
-# 跑全部测试（49 个）
-/Users/laofahai/Documents/workspace/vibe-lamp/.venv/bin/python -m pytest daemon
+# 跑全部测试（57 个）—— 必须在 daemon/ 目录下跑（否则 vibelamp 不在 import 路径）
+cd daemon && python -m pytest
 
 # 本地手动起守护进程
 cd daemon && python -m vibelamp
