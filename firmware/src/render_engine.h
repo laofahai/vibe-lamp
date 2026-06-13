@@ -26,3 +26,22 @@ struct Session {
 // sessions 为空 → 整体 IDLE。多会话 → 分段（仅 num_leds>1 有意义）。
 void render(const Session* sessions, uint8_t session_count,
            uint32_t now_ms, Rgb* out, uint8_t num_leds);
+
+// 用户可调的显示设置（存 NVS，默认 = 计划 01 原值）
+struct RenderSettings {
+  uint8_t brightness;        // 0..255 全局亮度（在渲染末端统一施加）
+  bool    animations;        // false = 各状态用静态基准色，不呼吸/闪
+  uint8_t speed_pct;         // 动画速度百分比，100 = 原速；200 = 快一倍
+  Rgb     col_working_code;
+  Rgb     col_working_command;
+  Rgb     col_working_search;
+  Rgb     col_done;
+  Rgb     col_needs_you;
+  Rgb     col_error;
+  Rgb     col_lost;
+  Rgb     col_boot;
+};
+
+RenderSettings render_default_settings();        // 计划 01 原值
+void render_set_settings(const RenderSettings& s);
+RenderSettings render_get_settings();

@@ -102,7 +102,48 @@ void test_boot_scans() {
   TEST_ASSERT_TRUE(head0.b != leds[0].b || head0.g != leds[0].g);
 }
 
-void setUp() {} void tearDown() {}
+// —— 计划 05：渲染设置运行时化 ——
+void test_default_settings_match_legacy() {
+  render_set_settings(render_default_settings());
+  Session s = mk(State::WORKING, ToolKind::CODE);
+  render(&s, 1, 0, &px, 1);          // 默认蓝呼吸波峰，蓝 > 红（与计划01一致）
+  TEST_ASSERT_GREATER_THAN_UINT8(px.r, px.b);
+}
+
+void test_custom_color_applied() {
+  RenderSettings cfg = render_default_settings();
+  cfg.col_done = Rgb{10, 20, 200};   // 把"完成"改成蓝
+  render_set_settings(cfg);
+  Session s = mk(State::DONE);
+  s.state_since_ms = 0;
+  render(&s, 1, 0, &px, 1);
+  TEST_ASSERT_GREATER_THAN_UINT8(px.r, px.b);   // 现在完成是蓝
+}
+
+void test_brightness_scales_output() {
+  RenderSettings cfg = render_default_settings();
+  cfg.brightness = 64;               // 1/4 亮度
+  render_set_settings(cfg);
+  Session s = mk(State::NEEDS_YOU);
+  s.state_since_ms = 0;
+  render(&s, 1, 0, &px, 1);          // needs_you 闪烁亮相位，但被亮度压到 ~1/4
+  TEST_ASSERT_LESS_THAN_UINT8(120, px.r);
+}
+
+void test_animations_off_is_static() {
+  RenderSettings cfg = render_default_settings();
+  cfg.animations = false;
+  render_set_settings(cfg);
+  Session s = mk(State::NEEDS_YOU);
+  s.state_since_ms = 0;
+  Rgb on, later;
+  render(&s, 1, 0,   &on,    1);
+  render(&s, 1, 600, &later, 1);     // 关动画：两个相位应一致（不再慢闪到灭）
+  TEST_ASSERT_EQUAL_UINT8(on.r, later.r);
+}
+
+void setUp() { render_set_settings(render_default_settings()); }
+void tearDown() {}
 
 int main() {
   UNITY_BEGIN();
@@ -116,5 +157,9 @@ int main() {
   RUN_TEST(test_two_sessions_split_ring);
   RUN_TEST(test_single_session_fills_all);
   RUN_TEST(test_boot_scans);
+  RUN_TEST(test_default_settings_match_legacy);
+  RUN_TEST(test_custom_color_applied);
+  RUN_TEST(test_brightness_scales_output);
+  RUN_TEST(test_animations_off_is_static);
   return UNITY_END();
 }
