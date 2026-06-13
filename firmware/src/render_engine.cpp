@@ -73,6 +73,13 @@ void render(const Session* sessions, uint8_t session_count,
     for (uint8_t i = 0; i < num_leds; ++i) out[i] = Rgb{0,0,0};
     return;
   }
+  if (session_count == 1 && sessions[0].state == State::BOOT) {
+    uint32_t e = now_ms - sessions[0].state_since_ms;
+    uint8_t head = (num_leds > 1) ? (uint8_t)((e / 80) % num_leds) : 0;
+    for (uint8_t i = 0; i < num_leds; ++i)
+      out[i] = (i == head) ? Rgb{0,120,160} : Rgb{0,0,0};
+    return;
+  }
   if (session_count == 1 || num_leds == 1) {
     Rgb c = animated_color(sessions[0], now_ms);
     for (uint8_t i = 0; i < num_leds; ++i) out[i] = c;

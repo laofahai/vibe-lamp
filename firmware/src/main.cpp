@@ -20,6 +20,15 @@ void setup() {
 }
 
 void loop() {
+  static uint32_t boot_start = millis();
+  if (millis() - boot_start < 1500) {
+    Session boot{ State::BOOT, ToolKind::NONE, boot_start, 0 };
+    render(&boot, 1, millis(), g_pixels, NUM_LEDS);
+    display().show(g_pixels, NUM_LEDS);
+    api_loop();
+    delay(16);
+    return;
+  }
   api_loop();
   uint32_t now = millis();
 

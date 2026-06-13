@@ -92,6 +92,16 @@ void test_single_session_fills_all() {
     TEST_ASSERT_GREATER_THAN_UINT8(leds[i].r, leds[i].b);  // 全蓝
 }
 
+void test_boot_scans() {
+  Rgb leds[16];
+  Session s = mk(State::BOOT);
+  s.state_since_ms = 0;
+  render(&s, 1, 0,   leds, 16);   // t=0 亮点在头部
+  Rgb head0 = leds[0];
+  render(&s, 1, 200, leds, 16);   // 稍后亮点移动
+  TEST_ASSERT_TRUE(head0.b != leds[0].b || head0.g != leds[0].g);
+}
+
 void setUp() {} void tearDown() {}
 
 int main() {
@@ -105,5 +115,6 @@ int main() {
   RUN_TEST(test_error_flashes_then_settles);
   RUN_TEST(test_two_sessions_split_ring);
   RUN_TEST(test_single_session_fills_all);
+  RUN_TEST(test_boot_scans);
   return UNITY_END();
 }
