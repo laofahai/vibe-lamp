@@ -83,6 +83,7 @@ def install():
     _launchctl("load", "-w", str(PLIST))
     print(f"✅ launchd 已加载 {PLIST}（开机自启 + 崩溃重拉）")
     _install_codex()
+    _ensure_default_config()
 
 
 def uninstall():
@@ -231,6 +232,16 @@ def _uninstall_codex():
         CODEX_CONFIG_TOML.write_text(
             strip_codex_toml_lines(_read_text_or_empty(CODEX_CONFIG_TOML)))
     print("✅ 已移除 Codex 钩子与 config.toml 追加块")
+
+
+def _ensure_default_config():
+    from vibelamp import config as cfg
+    path = cfg.CONFIG_PATH
+    if path.exists():
+        return                       # 已有就不覆盖用户改动
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cfg._DEFAULTS, indent=2, ensure_ascii=False))
+    print(f"✅ 已生成默认配置 {path}（可编辑工具分色/超时等）")
 
 
 if __name__ == "__main__":
