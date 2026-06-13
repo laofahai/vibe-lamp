@@ -1,196 +1,199 @@
+**English** | [简体中文](README.zh-CN.md)
+
 # Vibe Lamp
 
-> AI 编码状态实体氛围灯 —— 把 Claude Code / Codex 会话的实时状态做成一盏桌面氛围灯。
-> 余光一瞥就知道 AI 在干活、干完了、还是卡住要你介入，不用盯着屏幕。
+> A physical ambient status light for AI coding — turns your Claude Code / Codex session state into a desk lamp.
+> A glance tells you whether the AI is working, finished, or stuck waiting on you — no need to stare at the screen.
 
-**蓝 = 干活中 · 绿 = 完成 · 红 = 要你介入。** 它的灵感来自 [Vibe Island](https://vibeisland.app/)（macOS 刘海/菜单栏面板）——把同样的状态搬到桌上一盏看得见的灯上，可以说是它的「实体灯版」。
+**Blue = working · Green = done · Red = needs you.** Inspired by [Vibe Island](https://vibeisland.app/) (the macOS notch / menu-bar panel) — it brings the same status to a lamp you can actually see on your desk. Think of it as the "physical lamp edition."
 
-> **但不依赖、也无需安装 Vibe Island。** Vibe Lamp 直接读各 agent 自己的钩子（Claude Code `~/.claude/settings.json`、Codex `~/.codex/hooks.json`）拿状态，和 Vibe Island 是各自独立的「钩子消费者」。两者可以共存（钩子会各跑各的），也可以只装其一。
-
----
-
-## 它解决什么
-
-盯着终端等 AI agent 跑完、或者错过它卡住等你批准权限，都很累。Vibe Lamp 把当前编码会话的状态变成一束环境光：
-
-- **环境感知**：状态做成桌面氛围光，不抢注意力，但需要时一眼可见。
-- **不说谎**：灯永远反映真实状态。断线时显示「失联」（琥珀色慢呼吸），而不是冻结在旧颜色误导你。
-- **多 agent**：同时支持 Claude Code 和 Codex，架构上可扩展更多。
+> **But it does NOT depend on, nor require, Vibe Island.** Vibe Lamp reads each agent's own hooks directly (Claude Code `~/.claude/settings.json`, Codex `~/.codex/hooks.json`) to get state — it is an independent "hook consumer," just like Vibe Island. The two can coexist (hooks run side by side), or you can install just one.
 
 ---
 
-## 架构一览
+## What it solves
 
-业务逻辑全在 Mac 端，ESP32 只是个「傻瓜显示端」。三层各司其职：
+Staring at the terminal waiting for an AI agent to finish — or missing the moment it stalls waiting for your approval — is tiring. Vibe Lamp turns your current coding session's state into a beam of ambient light:
+
+- **Ambient awareness**: state becomes ambient desk light. It doesn't grab your attention, but it's visible at a glance when you need it.
+- **Never lies**: the lamp always reflects the real state. When the link drops it shows "lost" (amber slow breathing) instead of freezing on a stale color and misleading you.
+- **Multi-agent**: supports Claude Code and Codex at the same time, and is architecturally extensible to more.
+
+---
+
+## Architecture at a glance
+
+All the business logic lives on the Mac; the ESP32 is just a "dumb display." Three layers, each with one job:
 
 ```
-┌──────────────────────────── 你的 Mac ────────────────────────────┐
+┌──────────────────────────── Your Mac ────────────────────────────┐
 │                                                                   │
 │   Claude Code ──hooks──┐                                          │
-│                        ├──→  转译器（常驻后台守护进程）              │
-│   Codex ──────hooks────┘       · 合并所有会话状态                   │
-│                                · 决定该给灯显示什么                  │
-│                                · 心跳 + 超时兜底 + 推送重试           │
+│                        ├──→  Translator (resident background daemon)│
+│   Codex ──────hooks────┘       · merges all session state          │
+│                                · decides what the lamp should show  │
+│                                · heartbeat + timeout fallback + retry│
 │                                       │                           │
 └───────────────────────────────────────│──────────────────────────┘
-                                        │  WiFi / HTTP 推送 + 心跳
+                                        │  WiFi / HTTP push + heartbeat
                                         ▼
                               ┌────────────────────┐
-                              │  ESP32（傻瓜显示端） │
-                              │  · 收指令 → 驱动 LED │
-                              │  · 看门狗 → 失联检测  │
+                              │  ESP32 (dumb display)│
+                              │  · recv cmd → drive LED│
+                              │  · watchdog → lost det.│
                               └─────────│──────────┘
                                         ▼
-                          RGB LED / WS2812 灯环（出色彩 + 动效）
+                          RGB LED / WS2812 ring (color + animation)
 ```
 
-- **采集层**：各 agent 用自带的钩子机制，状态变化时用一行 `curl` 把事件 POST 给本地转译器（带 `--max-time 1 || true`，转译器挂掉也绝不拖慢 agent 本身）。
-- **转译/聚合层**：Mac 常驻守护进程，合并所有活动会话状态，算出「该显示什么」，经 WiFi 推给灯，并定期发心跳。
-- **显示层**：ESP32 跑一个小 HTTP 服务收指令，本地逐帧渲染颜色与动效；超过约 30 秒没收到消息就进入「失联」显示。
+- **Capture layer**: each agent uses its own hook mechanism; on every state change it POSTs the event to the local translator with a one-line `curl` (with `--max-time 1 || true`, so even if the translator is down it never slows the agent itself).
+- **Translate / aggregate layer**: a resident Mac daemon merges the state of all active sessions, computes "what to show," pushes it to the lamp over WiFi, and sends a periodic heartbeat.
+- **Display layer**: the ESP32 runs a tiny HTTP server to receive commands and renders color and animation frame-by-frame locally; if it goes ~30 s without a message it enters the "lost" display.
 
-> 加新 agent 只改转译器，**固件一行不动**。动画在固件本地跑，网络上只传「离散状态变化 + 心跳」，流量极小。
+> Adding a new agent only touches the translator — **not a single line of firmware changes**. Animations run locally on the firmware; only "discrete state changes + heartbeat" cross the network, so traffic is tiny.
 
 ---
 
-## 状态 → 颜色对照
+## State → color reference
 
-| 状态 | 显示 | 什么时候 |
+| State | Display | When |
 |---|---|---|
-| ⚫ 空闲 | 暗 / 灭 | 会话结束 / 无活动 |
-| 🔵 干活中 | 蓝**呼吸**，按工具分色：写码=蓝 · 跑命令=紫 · 搜索=青 | 提交指令 / 调用工具 |
-| 💓 推进一步 | 每次工具调用一个**跳动脉冲** | 调用工具 |
-| 🟢 完成 | 绿亮 3–5 秒 → **渐暗**回空闲 | 主回合结束 |
-| 🔴 要你介入 | 红**慢闪** | 需要权限 / 批准请求 |
-| ⚡ 出错 | 红**快闪一下** → 弹回干活色 | 工具调用报错 |
-| 🟠 失联 | 暗琥珀**慢呼吸**（明显区别于以上各色） | 看门狗约 30 秒没收到消息 |
-| 🚀 开机 | 上电跑个扫描动画 | 上电 / 会话开始 |
+| ⚫ Idle | Dim / off | Session ended / no activity |
+| 🔵 Working | Blue **breathing**, color-coded by tool: coding = blue · command = purple · search = cyan | Prompt submitted / tool called |
+| 💓 One step forward | A **pulse beat** on each tool call | Tool called |
+| 🟢 Done | Green for 3–5 s → **fades** back to idle | Main turn finished |
+| 🔴 Needs you | Red **slow blink** | Permission / approval request |
+| ⚡ Error | Red **quick flash** → snaps back to the working color | Tool call errored |
+| 🟠 Lost | Dim amber **slow breathing** (clearly distinct from all the above) | Watchdog: ~30 s with no message |
+| 🚀 Boot | Runs a sweep animation on power-up | Power-up / session start |
 
-**铁律**：「空闲（暗）」和「失联（琥珀）」严格区分——一盏卡死在蓝色的灯，比没有灯还坏。
+**Iron rule**: "idle (dim)" and "lost (amber)" are strictly distinguished — a lamp frozen on blue is worse than no lamp at all.
 
-多会话时（如 Claude Code + Codex 同开），灯环按段分配，每个会话占一段各显各的状态；单颗 RGB LED 只显示合并后的整体状态。
-
----
-
-## 怎么运转（合并优先级）
-
-转译器把所有活动会话合并成「该给灯显示什么」，单灯/整体氛围时的优先级：
-
-```
-任一会话「要你介入」 → 🔴 红（最高优先级）
-否则任一「出错」     → ⚡ 红快闪
-否则任一「干活中」   → 🔵 蓝呼吸
-否则有「刚完成」     → 🟢 绿（短暂，几秒后转空闲）
-否则全部空闲        → ⚫ 暗
-```
+With multiple sessions (e.g. Claude Code + Codex open together), a WS2812 ring is split into segments, each session occupying one segment showing its own state; a single RGB LED only shows the merged overall state.
 
 ---
 
-## 硬件清单
+## How it works (merge priority)
 
-打样只要一颗 RGB LED 就能验证完整的色彩与动效模型；想要多会话分段显示再上 WS2812 灯环。
+The translator merges all active sessions into "what the lamp should show." For a single LED / overall ambient mood, the priority is:
 
-| 部件 | 打样（最简） | 成品（可选升级） |
+```
+Any session "needs you"  → 🔴 red (highest priority)
+else any "error"         → ⚡ red quick flash
+else any "working"       → 🔵 blue breathing
+else any "just done"     → 🟢 green (brief, fades to idle after a few seconds)
+else all idle            → ⚫ dim
+```
+
+---
+
+## Hardware list
+
+A single RGB LED is enough to validate the full color and animation model; add a WS2812 ring later for multi-session segmented display.
+
+| Part | Prototype (minimal) | Finished build (optional upgrade) |
 |---|---|---|
-| 主控 | 手上的 ESP32 开发板 | ESP32-C3 SuperMini / XIAO ESP32-C3（更小更便宜，功能零差别） |
-| 显示 | 单颗**共阴 RGB LED**（3 路 PWM） | WS2812 灯环（16 灯） |
-| 配件 | 面包板、杜邦线、3 个 ~220Ω 限流电阻 | WS2812 数据线串 ~330Ω 电阻、电源并 ~1000µF 电容 |
-| 扩散 | 无（裸灯即可） | 乳白亚克力扩散罩 / 白色 PLA 3D 打印外壳 |
-| 供电 | USB | USB |
+| MCU | The ESP32 dev board you already have | ESP32-C3 SuperMini / XIAO ESP32-C3 (smaller, cheaper, zero feature difference) |
+| Display | A single **common-cathode RGB LED** (3 PWM channels) | WS2812 ring (16 LEDs) |
+| Parts | Breadboard, jumper wires, 3 × ~220Ω current-limit resistors | ~330Ω resistor in series on the WS2812 data line, ~1000µF cap across power |
+| Diffusion | None (bare LED is fine) | Milky acrylic diffuser / white PLA 3D-printed enclosure |
+| Power | USB | USB |
 
-> 详细接线、引脚、烧录、配网、点灯自测，见 **[HARDWARE.md](HARDWARE.md)**。
-
----
-
-## 快速上手
-
-跟着 **[HARDWARE.md](HARDWARE.md)** 走一遍，今晚就能让灯随真实会话变色，大致是：
-
-1. 接线（单颗 RGB LED 或 WS2812 灯环）。
-2. 烧录固件：`cd firmware && pio run -e esp32 -t upload`。
-3. 配网：手机连 `VibeLamp-Setup` 热点 → 浏览器自动弹配网页 → 填家里 WiFi 密码。
-4. 手动点灯自测：`curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`。
-5. 接入真实会话：`cd daemon && python install.py install`，然后开 Claude Code / Codex 跑任务看灯。
+> For detailed wiring, pinout, flashing, WiFi setup, and a light-up self-test, see **[HARDWARE.md](HARDWARE.md)**.
 
 ---
 
-## 开发 / 测试
+## Quick start
 
-**守护进程（Python，主链路仅标准库；BLE 兜底可选装 bleak）：**
+Follow **[HARDWARE.md](HARDWARE.md)** end to end and the lamp will track real sessions tonight. Roughly:
+
+1. Wire it up (single RGB LED, or a WS2812 ring).
+2. Flash the firmware: `cd firmware && pio run -e esp32 -t upload`.
+3. WiFi setup: connect your phone to the `VibeLamp-Setup` hotspot → the captive portal pops up → enter your home WiFi password.
+4. Manual light-up self-test: `curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`.
+5. Hook into real sessions: `cd daemon && python install.py install`, then run a task in Claude Code / Codex and watch the lamp.
+
+---
+
+## Develop / test
+
+**Daemon (Python, main path is stdlib-only; the optional BLE fallback needs `bleak`):**
 
 ```bash
-# 跑全部测试（57 个）—— 必须在 daemon/ 目录下跑（否则 vibelamp 不在 import 路径）
+# Run all tests (57) — must run from inside daemon/ (otherwise vibelamp isn't on the import path)
 cd daemon && python -m pytest
 
-# 本地手动起守护进程
+# Start the daemon manually for local use
 cd daemon && python -m vibelamp
 ```
 
-**固件（PlatformIO / Arduino-ESP32 core 2.0.17）：**
+**Firmware (PlatformIO / Arduino-ESP32 core 2.0.17):**
 
 ```bash
 cd firmware
 
-# 跑渲染引擎纯逻辑单测（14 个，无需开发板）
+# Run the render-engine pure-logic unit tests (14, no board needed)
 pio test -e native
 
-# 编译上板固件（单颗 RGB LED 版）
+# Build the on-board firmware (single RGB LED version)
 pio run -e esp32
 
-# 编译灯环版
+# Build the ring version
 pio run -e esp32_ring
 
-# 烧录 + 串口监视
+# Flash + serial monitor
 pio run -e esp32 -t upload && pio device monitor
 ```
 
-> 上面的 `pio` 可用仓库内置虚拟环境：`/Users/laofahai/Documents/workspace/vibe-lamp/.venv/bin/pio`。
+> The `pio` above can use the repo's bundled virtualenv: `.venv/bin/pio`.
 
 ---
 
-## 项目状态 / 路线图
+## Project status / roadmap
 
-设计文档 + 5 份实现计划已完成并公开。当前进度：
+The design doc + 5 implementation plans are complete and public. Current progress:
 
-**已完成**
-- ✅ 设计文档（三层架构、状态模型、显示驱动抽象、断线处理、自定义设置）。
-- ✅ ESP32 固件：联网 + mDNS（`vibelamp.local`）、HTTP `/state` `/health`、看门狗失联、四种显示硬件抽象、多会话分段、全套状态动效、开机动画。**14 个 native 测试全绿，`esp32` / `esp32_ring` 双 env 编译通过。**
-- ✅ Python 守护进程：会话合并、心跳、超时兜底、推送重试、launchd 自启；Claude Code + Codex 钩子接入（含 Codex）。**49 个 pytest 全绿。**
-- ✅ WiFiManager 网页配网（连 `VibeLamp-Setup` 热点，浏览器配网，凭据存 NVS，断电不丢）。
-- ✅ 用户自定义设置：灯自带设置网页（亮度/颜色/动画，存 NVS，访问 `http://vibelamp.local/`）+ 守护进程配置文件 `~/.vibelamp/config.json`。
+**Done**
+- ✅ Design doc (three-layer architecture, state model, display-driver abstraction, disconnection handling, custom settings).
+- ✅ ESP32 firmware: networking + mDNS (`vibelamp.local`), HTTP `/state` `/health`, watchdog lost-detection, four display-hardware abstractions, multi-session segmentation, the full set of state animations, boot animation. **All 14 native tests green; `esp32` / `esp32_ring` / `esp32_ble` all compile.**
+- ✅ Python daemon: session merge, heartbeat, timeout fallback, push retry, launchd autostart; Claude Code + Codex hook integration (Codex included). **All 57 pytest green.**
+- ✅ WiFiManager web provisioning (connect to the `VibeLamp-Setup` hotspot, configure in browser, credentials stored in NVS, survive power loss).
+- ✅ User customization: the lamp's own settings page (brightness / color / animation, stored in NVS, at `http://vibelamp.local/`) + daemon config file `~/.vibelamp/config.json`.
 
-**待做（v1.1+）**
-- ⏳ **计划 04 — BLE**：WiFi 断时切 BLE 兜底推送（双通道冗余）+ 乐鑫官方 App BLE 配网。
-- ⏳ **真机校准**：工具名→颜色映射表细化、上板观察动效手感、亮度/呼吸速度调优；Codex 钩子字段真机核对（计划 03 Task 5）。
-- ⏳ OTA 无线固件升级、手机直控灯、更多 agent（Gemini CLI / Cursor）、物理按钮、成品外壳。
+**To do (v1.1+)**
+- ⏳ **Plan 04 — BLE**: fall back to BLE push when WiFi drops (dual-channel redundancy) + Espressif official-app BLE provisioning.
+- ⏳ **On-device calibration**: refine the tool-name → color map, observe animation feel on the board, tune brightness / breathing speed; verify Codex hook fields on real hardware (Plan 03 Task 5).
+- ⏳ OTA wireless firmware update, direct phone control, more agents (Gemini CLI / Cursor), a physical button, a finished enclosure.
 
 ---
 
-## 目录结构
+## Directory structure
 
 ```
 vibe-lamp/
-├── README.md                  # 本文件
-├── HARDWARE.md                # 今晚照着做的硬件上手指南
-├── firmware/                  # ESP32 固件（PlatformIO）
-│   ├── platformio.ini         #   env：esp32 / esp32_ring / native
-│   ├── include/config.h       #   引脚、灯数、超时、mDNS 名、亮度上限
-│   ├── src/                   #   渲染引擎 + 显示驱动 + 网络 + HTTP API
-│   └── test/                  #   渲染引擎 native 单测
-├── daemon/                    # Mac 端守护进程（Python，仅标准库）
-│   ├── install.py             #   幂等装钩子 + launchd + Codex 配置
-│   ├── vibelamp/              #   服务器、会话合并、推灯客户端、配置
+├── README.md                  # English (GitHub homepage)
+├── README.zh-CN.md            # Chinese
+├── HARDWARE.md                # The hardware getting-started guide to follow tonight
+├── firmware/                  # ESP32 firmware (PlatformIO)
+│   ├── platformio.ini         #   envs: esp32 / esp32_ring / native
+│   ├── include/config.h       #   pins, LED count, timeout, mDNS name, brightness cap
+│   ├── src/                   #   render engine + display driver + networking + HTTP API
+│   └── test/                  #   render-engine native unit tests
+├── daemon/                    # Mac-side daemon (Python, stdlib only)
+│   ├── install.py             #   idempotent hook install + launchd + Codex config
+│   ├── vibelamp/              #   server, session merge, lamp push client, config
 │   └── tests/                 #   pytest
-└── superpowers/               # 设计文档与实现计划
-    ├── specs/                 #   总设计
-    └── plans/                 #   5 份实现计划
+└── superpowers/               # design doc & implementation plans
+    ├── specs/                 #   overall design
+    └── plans/                 #   5 implementation plans
 ```
 
 ---
 
-## 技术栈
+## Tech stack
 
-- **守护进程**：Python（仅标准库，零第三方依赖），macOS launchd 自启。
-- **固件**：PlatformIO + Arduino-ESP32（core 2.0.17）、FastLED、ArduinoJson、WiFiManager。
-- **寻址**：mDNS `vibelamp.local`（macOS 原生解析，无需额外软件）。
+- **Daemon**: Python (stdlib only, zero third-party deps), macOS launchd autostart.
+- **Firmware**: PlatformIO + Arduino-ESP32 (core 2.0.17), FastLED, ArduinoJson, WiFiManager.
+- **Addressing**: mDNS `vibelamp.local` (resolved natively by macOS, no extra software needed).
 
-设计文档：[superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
+Design doc: [superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
