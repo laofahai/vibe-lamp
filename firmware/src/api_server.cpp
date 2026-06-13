@@ -2,6 +2,8 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "api_server.h"
+#include "render_engine.h"
+#include "settings_store.h"
 
 static WebServer server(HTTP_PORT);
 static Session g_sessions[NUM_LEDS > 8 ? NUM_LEDS : 8];
@@ -62,7 +64,93 @@ static void handle_health() {
   server.send(200, "application/json", buf);
 }
 
+// —— 设置页：颜色用 #rrggbb，前端取色器直接对接 ——
+static String hex(Rgb c) {
+  char b[8]; snprintf(b, sizeof(b), "#%02x%02x%02x", c.r, c.g, c.b); return String(b);
+}
+static Rgb unhex(const String& s) {     // "#rrggbb" → Rgb
+  long v = strtol(s.c_str() + (s.startsWith("#") ? 1 : 0), nullptr, 16);
+  return Rgb{ (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)(v) };
+}
+
+static void handle_get_settings() {
+  RenderSettings s = render_get_settings();
+  JsonDocument d;
+  d["brightness"] = s.brightness;
+  d["animations"] = s.animations;
+  d["speed_pct"] = s.speed_pct;
+  d["working_code"]    = hex(s.col_working_code);
+  d["working_command"] = hex(s.col_working_command);
+  d["working_search"]  = hex(s.col_working_search);
+  d["done"]      = hex(s.col_done);
+  d["needs_you"] = hex(s.col_needs_you);
+  d["error"]     = hex(s.col_error);
+  d["lost"]      = hex(s.col_lost);
+  d["boot"]      = hex(s.col_boot);
+  String out; serializeJson(d, out);
+  server.send(200, "application/json", out);
+}
+
+static void handle_post_settings() {
+  JsonDocument d;
+  if (deserializeJson(d, server.arg("plain"))) {
+    server.send(400, "text/plain", "bad json"); return;
+  }
+  RenderSettings s = render_get_settings();
+  if (d["brightness"].is<int>()) s.brightness = (uint8_t)d["brightness"].as<int>();
+  if (d["animations"].is<bool>()) s.animations = d["animations"].as<bool>();
+  if (d["speed_pct"].is<int>())  s.speed_pct = (uint8_t)d["speed_pct"].as<int>();
+  if (d["working_code"].is<const char*>())    s.col_working_code = unhex(d["working_code"].as<String>());
+  if (d["working_command"].is<const char*>()) s.col_working_command = unhex(d["working_command"].as<String>());
+  if (d["working_search"].is<const char*>())  s.col_working_search = unhex(d["working_search"].as<String>());
+  if (d["done"].is<const char*>())      s.col_done = unhex(d["done"].as<String>());
+  if (d["needs_you"].is<const char*>()) s.col_needs_you = unhex(d["needs_you"].as<String>());
+  if (d["error"].is<const char*>())     s.col_error = unhex(d["error"].as<String>());
+  if (d["lost"].is<const char*>())      s.col_lost = unhex(d["lost"].as<String>());
+  if (d["boot"].is<const char*>())      s.col_boot = unhex(d["boot"].as<String>());
+  render_set_settings(s);     // 即时生效
+  settings_save(s);           // 落 NVS
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
+static const char SETTINGS_HTML[] PROGMEM = R"HTML(
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Vibe Lamp 设置</title><style>body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 12px}
+label{display:flex;justify-content:space-between;align-items:center;margin:10px 0}input[type=color]{width:48px}
+button{width:100%;padding:12px;margin-top:16px;font-size:16px}</style></head><body>
+<h2>Vibe Lamp 设置</h2>
+<label>亮度 <input id=brightness type=range min=0 max=255></label>
+<label>动画 <input id=animations type=checkbox></label>
+<label>动画速度% <input id=speed_pct type=number min=20 max=400></label>
+<label>干活·写码 <input id=working_code type=color></label>
+<label>干活·命令 <input id=working_command type=color></label>
+<label>干活·搜索 <input id=working_search type=color></label>
+<label>完成 <input id=done type=color></label>
+<label>要介入 <input id=needs_you type=color></label>
+<label>出错 <input id=error type=color></label>
+<label>失联 <input id=lost type=color></label>
+<label>开机 <input id=boot type=color></label>
+<button onclick=save()>保存</button>
+<p id=msg></p>
+<script>
+const ids=['brightness','animations','speed_pct','working_code','working_command','working_search','done','needs_you','error','lost','boot'];
+fetch('/settings').then(r=>r.json()).then(s=>{for(const k of ids){const e=document.getElementById(k);
+ if(e.type==='checkbox')e.checked=s[k];else e.value=s[k];}});
+function save(){const b={};for(const k of ids){const e=document.getElementById(k);
+ b[k]=e.type==='checkbox'?e.checked:(e.type==='color'?e.value:Number(e.value));}
+ fetch('/settings',{method:'POST',body:JSON.stringify(b)}).then(r=>r.json())
+ .then(()=>document.getElementById('msg').textContent='已保存 ✓');}
+</script></body></html>
+)HTML";
+
+static void handle_root() {
+  server.send_P(200, "text/html", SETTINGS_HTML);
+}
+
 void api_begin() {
+  server.on("/", HTTP_GET, handle_root);
+  server.on("/settings", HTTP_GET, handle_get_settings);
+  server.on("/settings", HTTP_POST, handle_post_settings);
   server.on("/state", HTTP_POST, handle_state);
   server.on("/health", HTTP_GET, handle_health);
   server.begin();
