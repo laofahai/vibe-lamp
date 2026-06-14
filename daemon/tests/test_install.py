@@ -30,3 +30,10 @@ def test_remove_only_ours():
     cmds = [h["command"] for e in cleaned["hooks"].get("Stop", []) for h in e["hooks"]]
     assert "echo mine" in cmds
     assert all("127.0.0.1:8787/event" not in c for c in cmds)
+
+
+def test_hook_cmd_port_matches_listen_port():
+    # 钩子 curl 的端口必须与 daemon 绑定口同源（config.LISTEN_PORT），杜绝漂移。
+    from vibelamp import config
+    assert f"127.0.0.1:{config.LISTEN_PORT}/event" in install.HOOK_CMD
+    assert f"127.0.0.1:{config.LISTEN_PORT}/event/codex" in install.CODEX_HOOK_CMD
