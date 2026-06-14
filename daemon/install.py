@@ -6,8 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from vibelamp import config as _cfg
+
+# 端口取自 config.LISTEN_PORT（固定契约常量），保证钩子 curl 与 daemon 绑定口同源、不漂移。
 HOOK_CMD = ('curl -s --max-time 1 -X POST '
-            'http://127.0.0.1:8787/event --data-binary @- || true')
+            f'http://127.0.0.1:{_cfg.LISTEN_PORT}/event --data-binary @- || true')
 HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
                "PostToolUseFailure", "Notification", "Stop", "SessionEnd"]
 
@@ -107,7 +110,7 @@ def uninstall():
 # ============ Codex 钩子（sidecar hooks.json + config.toml 最小追加） ============
 
 CODEX_HOOK_CMD = ('curl -s --max-time 1 -X POST '
-                  'http://127.0.0.1:8787/event/codex --data-binary @- || true')
+                  f'http://127.0.0.1:{_cfg.LISTEN_PORT}/event/codex --data-binary @- || true')
 CODEX_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse",
                 "PostToolUse", "Stop", "PermissionRequest"]
 

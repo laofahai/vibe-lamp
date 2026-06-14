@@ -36,14 +36,32 @@ def test_env_overrides_file(tmp_path, monkeypatch):
     assert c["lamp_url"] == "http://env.example/state"
 
 
-def test_env_bad_value_ignored(tmp_path, monkeypatch):
-    # 环境变量值解析失败（端口非数字）→ 忽略，回落 config.json / 默认值，不崩。
+def test_listen_port_is_fixed_contract(tmp_path, monkeypatch):
+    # 监听端口是 daemon 绑定口与 install.py 钩子 curl 之间的固定契约：
+    # 即便 config.json 写了 listen_port、或设了 VIBELAMP_PORT，daemon 实际绑定用的
+    # config.LISTEN_PORT 仍是固定常量、不漂移（否则钩子 curl 与绑定口会对不上）。
     p = tmp_path / "config.json"
     p.write_text(json.dumps({"listen_port": 9999}))
     monkeypatch.setattr(config, "CONFIG_PATH", p)
-    monkeypatch.setenv("VIBELAMP_PORT", "not-a-number")
+    monkeypatch.setenv("VIBELAMP_PORT", "12345")
+    try:
+        config.apply_config()                       # 重新解析也不会改动端口
+        assert config.LISTEN_PORT == 8787           # 固定常量，config/env 都改不动
+        assert "listen_port" not in config._ENV_OVERRIDES   # 端口已移出环境覆盖映射
+    finally:
+        monkeypatch.undo()       # 还原 CONFIG_PATH/环境变量到真实磁盘
+        config.apply_config()    # 用真实配置回填模块常量，杜绝污染其它用例
+
+
+def test_env_override_bad_value_ignored(tmp_path, monkeypatch):
+    # _apply_env_overrides 对解析失败的环境变量值必须忽略（不崩），保留 file/默认。
+    # 临时注入一个 int 覆盖项触发解析失败路径（监听端口已不再可配，故另造一个）。
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "none.json")
+    monkeypatch.setitem(config._ENV_OVERRIDES, "session_ttl_sec",
+                        ("VIBELAMP_TTL_TEST", int))
+    monkeypatch.setenv("VIBELAMP_TTL_TEST", "not-a-number")
     c = config.load_config()
-    assert c["listen_port"] == 9999
+    assert c["session_ttl_sec"] == 1800      # 坏值忽略，回落默认
 
 
 def test_apply_config_backfills_module_constants(tmp_path, monkeypatch):

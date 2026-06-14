@@ -7,6 +7,9 @@
 改动需重启守护进程生效（不做热重载，符合 HARDWARE.md 的「编辑后重启生效」约定）。
 
 环境变量保留覆盖能力：即便 config.json 写了某字段，设了对应环境变量仍以环境变量为准。
+
+注意：监听端口（LISTEN_PORT）不在可配字段内——它是 daemon 绑定口与 install.py 写入
+钩子 curl 的固定契约，改它会让二者漂移、状态再也送不到灯。需自定端口时用 serve(port=)。
 """
 import json
 import os
@@ -15,6 +18,10 @@ from pathlib import Path
 # —— 固定（非运行期可配）——
 # 守护进程监听地址（钩子 curl 的目标，固定回环）
 LISTEN_HOST = "127.0.0.1"
+# 守护进程监听端口：daemon 绑定口 == install.py 写入钩子 curl 的端口，是二者之间的固定
+# 契约。故意不走 config.json/环境变量——改它会让钩子 URL 与绑定口漂移、状态送不到灯。
+# 测试需自定端口时用 server.serve(port=...) 显式传入。
+LISTEN_PORT = 8787
 
 # —— Codex 配置文件路径 ——
 CODEX_DIR = Path.home() / ".codex"
@@ -34,8 +41,6 @@ CONFIG_PATH = Path.home() / ".vibelamp" / "config.json"
 _DEFAULTS = {
     # 灯的状态端点（macOS 原生解析 .local）
     "lamp_url": "http://vibelamp.local/state",
-    # 守护进程监听端口（钩子 curl 的目标）
-    "listen_port": 8787,
     # 心跳间隔（秒）：每 5s 重推（兼做灯重启自愈）
     "heartbeat_sec": 5.0,
     # 推送灯的超时（秒）
@@ -66,7 +71,6 @@ def _as_bool(v):
 
 _ENV_OVERRIDES = {
     "lamp_url": ("VIBELAMP_URL", str),
-    "listen_port": ("VIBELAMP_PORT", int),
     "ble_fallback_enabled": ("VIBELAMP_BLE", _as_bool),
     "ble_bridge_socket": ("VIBELAMP_BLE_SOCK", str),
 }
@@ -109,11 +113,10 @@ def apply_config():
     模块导入时调用一次（见文件末尾）；改了 CONFIG_PATH / 环境变量后可再调以刷新
     （主要给测试与显式刷新用）。返回最新的配置字典。
     """
-    global LAMP_URL, LISTEN_PORT, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
+    global LAMP_URL, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
     global BLE_FALLBACK_ENABLED, BLE_BRIDGE_SOCKET, BLE_DEVICE_NAME
     cfg = load_config()
     LAMP_URL = cfg["lamp_url"]
-    LISTEN_PORT = cfg["listen_port"]
     HEARTBEAT_SEC = cfg["heartbeat_sec"]
     PUSH_TIMEOUT_SEC = cfg["push_timeout_sec"]
     SESSION_TTL_SEC = cfg["session_ttl_sec"]
@@ -124,6 +127,7 @@ def apply_config():
 
 
 # 模块导入时解析一次，回填下列模块级常量（运行期各模块直接读这些常量）：
-#   LAMP_URL / LISTEN_PORT / HEARTBEAT_SEC / PUSH_TIMEOUT_SEC / SESSION_TTL_SEC /
+#   LAMP_URL / HEARTBEAT_SEC / PUSH_TIMEOUT_SEC / SESSION_TTL_SEC /
 #   BLE_FALLBACK_ENABLED / BLE_BRIDGE_SOCKET / BLE_DEVICE_NAME
+# （LISTEN_PORT 是固定契约常量，见文件顶部，不经 config 回填。）
 apply_config()
