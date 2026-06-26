@@ -1,16 +1,15 @@
-name: CI
+name: Release
 
 on:
   push:
-    branches: ["**"]
-  pull_request:
+    tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  daemon:
-    runs-on: macos-latest
+  release:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,17 +20,9 @@ jobs:
       - name: Test daemon
         run: python -m pytest
         working-directory: daemon
-
-  firmware:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
       - name: Install PlatformIO
         run: python -m pip install platformio
-      - name: Native tests
+      - name: Native firmware tests
         run: pio test -e native
         working-directory: firmware
       - name: Build c3_rgb
@@ -46,3 +37,14 @@ jobs:
       - name: Build esp32_ble
         run: pio run -e esp32_ble
         working-directory: firmware
+      - name: Package release artifacts
+        run: python scripts/package_release.py --no-build --env c3_rgb --env esp32 --env esp32_ring --env esp32_ble
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibe-lamp-release
+          path: dist/*.zip
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
