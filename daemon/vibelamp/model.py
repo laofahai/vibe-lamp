@@ -35,6 +35,32 @@ class SessionStore:
             for sid in dead:
                 del self._sessions[sid]
 
+    def demote_stale_working(self, timeout):
+        """把「working 但超过 timeout 没新事件」的会话降级为 idle（灯随之灭）。
+
+        ESC / kill 中断不会触发 Stop 钩子 → 会话永远停在 working、灯卡在蓝色。
+        心跳里定期调用本方法兜底自愈。不刷新 updated_at（仍按原时间走 TTL，
+        最终被 sweep 清掉）。返回被降级的会话数。"""
+        now = self._clock()
+        n = 0
+        with self._lock:
+            for s in self._sessions.values():
+                if s.state == "working" and now - s.updated_at > timeout:
+                    s.state = "idle"
+                    s.tool = "none"
+                    n += 1
+        return n
+
+    def snapshot(self):
+        """调试面板用：每个会话的 sid / state / tool / 距上次事件秒数（含 idle）。"""
+        now = self._clock()
+        with self._lock:
+            return [
+                {"sid": sid, "state": s.state, "tool": s.tool,
+                 "age_sec": round(now - s.updated_at, 1)}
+                for sid, s in self._sessions.items()
+            ]
+
     def to_wire(self):
         with self._lock:
             active = [s for s in self._sessions.values() if s.state != "idle"]
