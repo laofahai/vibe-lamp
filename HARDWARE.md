@@ -145,39 +145,45 @@ pio run -e esp32_ring -t upload
 
 不用装守护进程，直接用 `curl` 推状态，验证整条「HTTP → 渲染 → 灯」链路。逐条执行，看灯：
 
+> **两个必带的 flag（否则常踩坑）**：
+> - `-H 'Content-Type: application/json'` —— 不带的话 `curl -d` 默认按表单类型发送，固件解析不到 JSON 会返回 **400 bad json**。
+> - `--noproxy '*'` —— 你的 Mac 若设了系统代理（HTTP_PROXY 等），curl 会把发往局域网灯的请求也走代理 → **502**。带上它强制直连。没设代理时它是无害的空操作，留着即可。
+>
+> 下面每条都已带上这两个 flag，复制即用。
+
 ```bash
 # 干活中 → 蓝呼吸
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"working","tool":"code"}]}'
 
 # 要你介入 → 红慢闪
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"needs_you"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"needs_you"}]}'
 
 # 完成 → 绿亮后渐暗
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"done"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"done"}]}'
 
 # 出错 → 红快闪一下后弹回
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"error"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"error"}]}'
 
 # 看设备健康状态（返回会话数、运行时长）
-curl http://vibelamp.local/health
+curl --noproxy '*' http://vibelamp.local/health
 ```
 
 工具分色（`working` 状态下试不同 `tool`）：
 
 ```bash
 # 写码=蓝
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"working","tool":"code"}]}'
 # 跑命令=紫
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"command"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"working","tool":"command"}]}'
 # 搜索=青
-curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"search"}]}'
+curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' -d '{"sessions":[{"state":"working","tool":"search"}]}'
 ```
 
 **失联自测**：推一条状态后，**停 30 秒不再发**。看门狗超时后灯会转为**琥珀色慢呼吸**（失联态）。再推任意一条 `/state`，灯立即恢复正确显示。
 
 > 灯环版还能验证多会话分段——一次推两个会话，前半圈一个状态、后半圈另一个：
 > ```bash
-> curl -X POST http://vibelamp.local/state \
+> curl --noproxy '*' -X POST http://vibelamp.local/state -H 'Content-Type: application/json' \
 >   -d '{"sessions":[{"state":"working","tool":"code"},{"state":"needs_you"}]}'
 > ```
 > 预期：前半圈蓝呼吸、后半圈红慢闪。

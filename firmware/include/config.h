@@ -24,11 +24,19 @@
 
 // —— 引脚 ——
 // RGB LED（共阴；共阳需在驱动里反相）
+#ifndef PIN_RGB_R
 #define PIN_RGB_R 25
+#endif
+#ifndef PIN_RGB_G
 #define PIN_RGB_G 26
+#endif
+#ifndef PIN_RGB_B
 #define PIN_RGB_B 27
+#endif
 // WS2812 数据脚
+#ifndef PIN_WS2812
 #define PIN_WS2812 4
+#endif
 
 // —— PWM ——
 #define LEDC_FREQ 5000
@@ -46,10 +54,19 @@
 #define PROV_AP_NAME       "VibeLamp-Setup"   // 配网热点 SSID
 #define PROV_AP_PASS       ""                 // 空 = 开放热点（家用够用；要加密改成 >=8 位）
 #define PROV_PORTAL_TIMEOUT 180               // 配网门户超时（秒）；超时后退出门户继续 loop
+#define WIFI_CONNECT_TIMEOUT_MS 12000UL       // 每轮自动连接已知 WiFi 的最长等待
+#define WIFI_CONNECT_ROUNDS     2             // 多试一轮，避免路由器刚启动/瞬时抖动误进门户
 
 // —— 重配网按钮（开机长按触发 resetSettings + 重开门户）——
-// 用板载 BOOT 按钮（多数 ESP32 开发板 = GPIO0，已接上拉，按下拉低）
+// 用板载 BOOT 按钮（多数经典 ESP32 开发板 = GPIO0，已接上拉，按下拉低）。
+// 注意 ESP32-C3：BOOT 键是 GPIO9，且是 strapping 脚——上电瞬间拉低会进「串口下载模式」、
+//   固件根本不运行，所以 C3 上「开机长按 BOOT」这套用不了。C3 产品板请把按钮接到一个
+//   空闲 GPIO（如 GPIO10/0/1/3/4），用 build_flag -DPIN_RESET_BTN=<gpio> 覆盖；
+//   面包板没接按钮时无需理会（GPIO0 在 C3 非 strapping，INPUT_PULLUP 读高=未按，不会误触）。
+//   无按钮也可随时用 HTTP `curl -X POST http://vibelamp.local/reset` 清网重配。
+#ifndef PIN_RESET_BTN
 #define PIN_RESET_BTN      0
+#endif
 #define RESET_HOLD_MS      3000UL             // 开机时长按 3s 触发重配网
 
 // —— BLE 状态推送服务（Part B②，与配网无关，可与 WiFi 共存）——

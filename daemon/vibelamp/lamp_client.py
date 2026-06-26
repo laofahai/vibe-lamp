@@ -6,6 +6,12 @@ from . import config
 
 log = logging.getLogger("vibelamp.lamp")
 
+# 灯永远在局域网（mDNS vibelamp.local / LAN IP）——绝不该走转发代理。
+# urllib 默认 opener 会读 HTTP_PROXY/http_proxy/ALL_PROXY 等环境变量并代理请求；
+# 用户 Mac 设了系统代理时，推灯请求会被代理劫走 → 灯收不到（与联调期 curl 的 502 同源）。
+# 用「空 ProxyHandler」构造一个永不走代理的 opener，专供推灯用（空 dict 会覆盖读环境变量的默认行为）。
+_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def _send_ble(payload):
     """把 wire JSON 经本地 Unix socket 交给常驻 BLE 桥接进程。
@@ -45,7 +51,7 @@ def push(payload, url=None, timeout=None):
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _opener.open(req, timeout=timeout) as resp:
             if 200 <= resp.status < 300:
                 return True
     except Exception as e:

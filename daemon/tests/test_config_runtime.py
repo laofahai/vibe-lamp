@@ -22,12 +22,12 @@ def test_lamp_client_push_uses_config_lamp_url(tmp_path, monkeypatch):
     try:
         captured = {}
 
-        def _fake_urlopen(req, timeout=None):
+        def _fake_open(req, timeout=None):
             captured["url"] = req.full_url
             captured["timeout"] = timeout
             raise RuntimeError("不实际联网，只截获目标地址")
 
-        monkeypatch.setattr(lamp_client.urllib.request, "urlopen", _fake_urlopen)
+        monkeypatch.setattr(lamp_client._opener, "open", _fake_open)
         ok = lamp_client.push({"sessions": []})       # 不传 url / timeout
         assert ok is False                            # urlopen 抛错 → 老行为返回 False
         assert captured["url"] == "http://1.2.3.4/state"
@@ -42,11 +42,11 @@ def test_lamp_client_push_uses_config_push_timeout(tmp_path, monkeypatch):
     try:
         captured = {}
 
-        def _fake_urlopen(req, timeout=None):
+        def _fake_open(req, timeout=None):
             captured["timeout"] = timeout
             raise RuntimeError("不实际联网")
 
-        monkeypatch.setattr(lamp_client.urllib.request, "urlopen", _fake_urlopen)
+        monkeypatch.setattr(lamp_client._opener, "open", _fake_open)
         lamp_client.push({"sessions": []})
         assert captured["timeout"] == 0.42
     finally:
