@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install daemon package
-        run: python -m pip install -e daemon
+        run: python -m pip install -e daemon pytest
       - name: Test daemon
         run: python -m pytest
         working-directory: daemon
