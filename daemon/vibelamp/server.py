@@ -121,7 +121,10 @@ def handle_path_event(path, event):
         log.warning("丢弃未知状态 %r（会话 %s）", state, sid)
         _record_event(path, event, sid, "dropped:" + str(state))
         return True       # 路径/事件有效，仅该状态不可信 → 忽略
-    store.update(sid, state, tool)
+    # in_flight：PreToolUse 表示某工具刚开跑、还没等到 PostToolUse（可能是长构建）。
+    # 用于自愈分档——有工具在跑时给更长的静默超时，避免长任务被误判空闲灭灯。
+    in_flight = (event or {}).get("hook_event_name") == "PreToolUse"
+    store.update(sid, state, tool, in_flight=in_flight)
     _record_event(path, event, sid, _result_str(state, tool))
     _push_current()
     return True
@@ -197,8 +200,11 @@ def _heartbeat_loop():
     while not _stop.wait(config.HEARTBEAT_SEC):
         try:
             store.sweep()
-            # ESC/kill 不发 Stop → working 会卡住；超时降级为 idle 让灯自愈。
-            store.demote_stale_working(config.WORKING_IDLE_TIMEOUT_SEC)
+            # ESC/kill 不发任何钩子 → working 会卡住（蓝）；静默超时降级 idle 让灯自愈。
+            # needs_you(红·该你了)故意不在此降级——要一直提醒你（见 model.demote_stale）。
+            # 两档：没工具在跑用短超时、有长构建在跑用长超时。
+            store.demote_stale(config.WORKING_IDLE_TIMEOUT_SEC,
+                               config.WORKING_TOOL_TIMEOUT_SEC)
             _push_current()
         except Exception as e:
             log.debug("heartbeat error: %s", e)

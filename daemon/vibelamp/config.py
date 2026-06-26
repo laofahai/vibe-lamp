@@ -47,10 +47,13 @@ _DEFAULTS = {
     "push_timeout_sec": 1.0,
     # 无活动多久算死会话（秒）：30min 兜底清理
     "session_ttl_sec": 1800,
-    # working 但多久没新事件就降级为 idle（秒）：ESC/kill 不发 Stop 钩子 → 会话卡在
-    # working、灯卡蓝；此兜底让灯自愈。取值须 > 最长单次工具调用（长构建/测试），否则
-    # 长任务静默期会被误判空闲、先灭一下再亮（PostToolUse 到达时重新点亮）。
-    "working_idle_timeout_sec": 180,
+    # 活动会话静默多久就降级 idle 灭灯（秒）——ESC/kill 不发任何钩子，灯会卡住，靠此自愈。
+    # 分两档（见 model.demote_stale）：
+    #   idle 档：没工具在跑（纯思考/纯文字/已被中断）→ 短超时，尽快灭。
+    "working_idle_timeout_sec": 90,
+    #   tool 档：有工具在跑（PreToolUse 后、PostToolUse 前，可能是几分钟的长构建）→ 长超时，
+    #   绝不误杀。须 > 你最长的单次构建/测试时长。
+    "working_tool_timeout_sec": 600,
     # BLE 兜底桥接（默认关闭，确保现有 WiFi-only 行为不变）
     "ble_fallback_enabled": False,
     # 守护进程 → BLE 桥接进程 的本地通道（Unix domain socket 路径）
@@ -118,7 +121,7 @@ def apply_config():
     （主要给测试与显式刷新用）。返回最新的配置字典。
     """
     global LAMP_URL, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
-    global WORKING_IDLE_TIMEOUT_SEC
+    global WORKING_IDLE_TIMEOUT_SEC, WORKING_TOOL_TIMEOUT_SEC
     global BLE_FALLBACK_ENABLED, BLE_BRIDGE_SOCKET, BLE_DEVICE_NAME
     cfg = load_config()
     LAMP_URL = cfg["lamp_url"]
@@ -126,6 +129,7 @@ def apply_config():
     PUSH_TIMEOUT_SEC = cfg["push_timeout_sec"]
     SESSION_TTL_SEC = cfg["session_ttl_sec"]
     WORKING_IDLE_TIMEOUT_SEC = cfg["working_idle_timeout_sec"]
+    WORKING_TOOL_TIMEOUT_SEC = cfg["working_tool_timeout_sec"]
     BLE_FALLBACK_ENABLED = cfg["ble_fallback_enabled"]
     BLE_BRIDGE_SOCKET = cfg["ble_bridge_socket"]
     BLE_DEVICE_NAME = cfg["ble_device_name"]

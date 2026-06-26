@@ -37,31 +37,64 @@ def test_sweep_expires_old_sessions():
     assert s.to_wire() == {"sessions": []}
 
 
-# ——— ESC/kill 卡蓝自愈：demote_stale_working ———————————————
+# ——— ESC/kill 卡灯自愈：demote_stale（两档超时）———————————————
 
-def test_demote_stale_working_to_idle():
+def test_demote_idle_timeout_no_tool():
+    """没工具在跑、静默超过短超时 → 降级 idle（灯灭）。"""
+    clock = [1000.0]
+    s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
+    s.update("a", "working", "code", in_flight=False)
+    clock[0] += 100                  # 100s > 90s 短超时
+    assert s.demote_stale(90, 600) == 1
+    assert s.to_wire() == {"sessions": []}
+
+def test_demote_leaves_fresh():
+    """刚有过事件 → 远没超时，不动（正常干活不误杀）。"""
     clock = [1000.0]
     s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
     s.update("a", "working", "code")
-    clock[0] = 1000.0 + 200          # 200s 没新事件，超过 180s 阈值
-    assert s.demote_stale_working(180) == 1
-    assert s.to_wire() == {"sessions": []}   # 降级为 idle → 不再上灯（灯灭）
-
-def test_demote_leaves_fresh_working():
-    clock = [1000.0]
-    s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
-    s.update("a", "working", "code")
-    clock[0] = 1000.0 + 10           # 才 10s，远没超时（长构建静默期不误杀）
-    assert s.demote_stale_working(180) == 0
+    clock[0] += 10
+    assert s.demote_stale(90, 600) == 0
     assert s.to_wire() == {"sessions": [{"state": "working", "tool": "code"}]}
 
-def test_demote_ignores_non_working():
+def test_demote_tool_in_flight_uses_long_timeout():
+    """有工具在跑（长构建）→ 用长超时：过了短超时也不灭，超过长超时才灭。"""
+    clock = [1000.0]
+    s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
+    s.update("a", "working", "command", in_flight=True)
+    clock[0] += 100                  # 已过 90s 短超时，但工具在跑 → 不灭（长构建不误杀）
+    assert s.demote_stale(90, 600) == 0
+    assert s.to_wire() == {"sessions": [{"state": "working", "tool": "command"}]}
+    clock[0] += 600                  # 累计 700s > 600s 长超时 → 灭
+    assert s.demote_stale(90, 600) == 1
+    assert s.to_wire() == {"sessions": []}
+
+def test_demote_keeps_needs_you():
+    """needs_you(红·该你了)是要持续提醒的「找你」态——绝不被 90s 掐断，
+    一直亮到你处理或会话 TTL 清理。这是用户明确要的行为。"""
     clock = [1000.0]
     s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
     s.update("a", "needs_you", "none")
-    clock[0] = 1000.0 + 9999         # needs_you/done/error 是合法静止态，永不被降级
-    assert s.demote_stale_working(180) == 0
+    clock[0] += 100                  # 远超短超时，但 needs_you 不该被降级
+    assert s.demote_stale(90, 600) == 0
     assert s.to_wire() == {"sessions": [{"state": "needs_you", "tool": "none"}]}
+
+def test_demote_keeps_error():
+    """error(红·快闪)同属「找你」态，也不被自愈掐断。"""
+    clock = [1000.0]
+    s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
+    s.update("a", "error", "none")
+    clock[0] += 100
+    assert s.demote_stale(90, 600) == 0
+    assert s.to_wire() == {"sessions": [{"state": "error", "tool": "none"}]}
+
+def test_demote_skips_idle():
+    """idle 本就是灭灯态，跳过（返回 0）。"""
+    clock = [1000.0]
+    s = SessionStore(ttl_sec=1800, clock=lambda: clock[0])
+    s.update("a", "idle", "none")
+    clock[0] += 9999
+    assert s.demote_stale(90, 600) == 0
 
 
 # ——— 调试面板快照：snapshot ————————————————————————————
