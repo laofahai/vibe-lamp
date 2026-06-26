@@ -1,6 +1,7 @@
 import json
 import logging
 import socket
+import time
 import urllib.request
 from urllib.parse import urlsplit, urlunsplit
 from . import config
@@ -21,6 +22,21 @@ _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _ip_cache = {}   # hostname -> ip
 
 
+def _resolve_ipv4(host, port, attempts=3):
+    """把主机名解析成 IPv4。mDNS(.local)在某些 Mac 上会间歇性报错（系统 ping 能解析、
+    Python getaddrinfo 却时好时坏），故重试几次；强制 AF_INET（灯是 IPv4 设备，且避开
+    部分 Mac 上 IPv6/AAAA 解析挂数秒的坑）。全部失败返回 None。"""
+    for i in range(attempts):
+        try:
+            return socket.getaddrinfo(host, port,
+                                      socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
+        except Exception as e:
+            log.debug("解析 %s 失败（第 %d 次）：%s", host, i + 1, e)
+            if i < attempts - 1:
+                time.sleep(0.3)
+    return None
+
+
 def _ipify(url):
     """把 url 主机名解析成 IPv4 并替换。已是 IP 字面量 / 解析失败 → 原样返回（不抛）。"""
     parts = urlsplit(url)
@@ -34,14 +50,10 @@ def _ipify(url):
         pass
     ip = _ip_cache.get(host)
     if ip is None:
-        try:
-            # 只取 IPv4：灯是 IPv4 设备，且避开部分 Mac 上 IPv6(AAAA) 解析挂数秒的坑
-            infos = socket.getaddrinfo(host, parts.port or 80,
-                                       socket.AF_INET, socket.SOCK_STREAM)
-            ip = infos[0][4][0]
-            _ip_cache[host] = ip
-        except Exception:
-            return url                      # 解析不了 → 回退原 url，交给 urllib 自己试
+        ip = _resolve_ipv4(host, parts.port or 80)
+        if ip is None:
+            return url                      # 多次重试仍解析不了 → 回退原 url，交给 urllib 自己试
+        _ip_cache[host] = ip
     netloc = ip if not parts.port else "%s:%d" % (ip, parts.port)
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
