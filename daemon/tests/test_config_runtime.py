@@ -37,7 +37,9 @@ def test_lamp_client_push_uses_config_lamp_url(tmp_path, monkeypatch):
 
 def test_lamp_client_push_uses_config_push_timeout(tmp_path, monkeypatch):
     """config.json 设了 push_timeout_sec → push() 不传 timeout 时就该用它。"""
-    _write_cfg(tmp_path, monkeypatch, {"push_timeout_sec": 0.42})
+    # lamp_url 用 IP 字面量，避免 _ipify 去做真实 mDNS 解析（保持单测无网络、快）。
+    _write_cfg(tmp_path, monkeypatch, {"push_timeout_sec": 0.42,
+                                       "lamp_url": "http://127.0.0.1:9/state"})
     config.apply_config()
     try:
         captured = {}
