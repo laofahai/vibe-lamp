@@ -9,7 +9,10 @@ from pathlib import Path
 from vibelamp import config as _cfg
 
 # 端口取自 config.LISTEN_PORT（固定契约常量），保证钩子 curl 与 daemon 绑定口同源、不漂移。
-HOOK_CMD = ('curl -s --max-time 1 -X POST '
+# -o /dev/null：丢弃 daemon 回包，绝不往 stdout 写。Codex 会把钩子 stdout 当成
+# 「钩子决策 JSON」解析，回包 {"ok":true} 不符合其 schema 会报 invalid output；空 stdout
+# 才是合法 no-op（见 Codex 官方钩子脚本，无操作时不写 stdout）。Claude 端也顺带更干净。
+HOOK_CMD = ('curl -s -o /dev/null --max-time 1 -X POST '
             f'http://127.0.0.1:{_cfg.LISTEN_PORT}/event --data-binary @- || true')
 HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
                "PostToolUseFailure", "Notification", "Stop", "SessionEnd"]
@@ -109,7 +112,7 @@ def uninstall():
 
 # ============ Codex 钩子（sidecar hooks.json + config.toml 最小追加） ============
 
-CODEX_HOOK_CMD = ('curl -s --max-time 1 -X POST '
+CODEX_HOOK_CMD = ('curl -s -o /dev/null --max-time 1 -X POST '
                   f'http://127.0.0.1:{_cfg.LISTEN_PORT}/event/codex --data-binary @- || true')
 CODEX_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse",
                 "PostToolUse", "Stop", "PermissionRequest"]
@@ -122,7 +125,7 @@ _TOML_BEGIN = "# >>> VIBELAMP BEGIN (managed by vibelamp install.py) >>>"
 _TOML_END = "# <<< VIBELAMP END <<<"
 # notify 作为 hooks 的冗余通道（payload 为 kebab-case，v1 仅装上不强依赖）
 _TOML_BODY = (
-    'notify = ["curl", "-s", "--max-time", "1", "-X", "POST", '
+    'notify = ["curl", "-s", "-o", "/dev/null", "--max-time", "1", "-X", "POST", '
     '"http://127.0.0.1:8787/event/codex", "--data-binary", "@-"]'
 )
 
