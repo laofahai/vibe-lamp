@@ -60,14 +60,14 @@ void test_done_fades_out() {
   TEST_ASSERT_LESS_THAN_UINT8(40, late.g);
 }
 
-void test_error_flashes_then_settles() {
+void test_error_is_steady_red() {
   Session s = mk(State::ERROR);
   s.state_since_ms = 0;
-  Rgb flash, after;
-  render(&s, 1, 0,   &flash, 1);   // 快闪窗内：红
-  render(&s, 1, 500, &after, 1);   // 快闪窗后（~300ms）：灭，等转译器推下一状态
-  TEST_ASSERT_GREATER_THAN_UINT8(120, flash.r);
-  TEST_ASSERT_LESS_THAN_UINT8(40, after.r);
+  Rgb early, later;
+  render(&s, 1, 0,   &early, 1);
+  render(&s, 1, 500, &later, 1);
+  TEST_ASSERT_GREATER_THAN_UINT8(120, early.r);
+  TEST_ASSERT_EQUAL_UINT8(early.r, later.r);
 }
 
 void test_two_sessions_split_ring() {
@@ -153,7 +153,7 @@ int main() {
   RUN_TEST(test_working_breathes);
   RUN_TEST(test_needs_you_blinks_off);
   RUN_TEST(test_done_fades_out);
-  RUN_TEST(test_error_flashes_then_settles);
+  RUN_TEST(test_error_is_steady_red);
   RUN_TEST(test_two_sessions_split_ring);
   RUN_TEST(test_single_session_fills_all);
   RUN_TEST(test_boot_scans);

@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  daemon:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install daemon package
+        run: python -m pip install -e daemon
+      - name: Test daemon
+        run: python -m pytest
+        working-directory: daemon
+
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PlatformIO
+        run: python -m pip install platformio
+      - name: Native tests
+        run: pio test -e native
+        working-directory: firmware
+      - name: Build c3_rgb
+        run: pio run -e c3_rgb
+        working-directory: firmware
+      - name: Build esp32
+        run: pio run -e esp32
+        working-directory: firmware
+      - name: Build esp32_ring
+        run: pio run -e esp32_ring
+        working-directory: firmware
+      - name: Build esp32_ble
+        run: pio run -e esp32_ble
+        working-directory: firmware
+      - name: Package release artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python scripts/package_release.py --no-build --env c3_rgb --env esp32 --env esp32_ring --env esp32_ble
+      - name: Upload artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibe-lamp-release
+          path: dist/*.zip
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip

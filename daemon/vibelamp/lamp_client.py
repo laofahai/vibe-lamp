@@ -111,6 +111,21 @@ def push(payload, url=None, timeout=None):
         except Exception as e:
             log.debug("lamp push failed (attempt %d): %s", attempt, e)
             _invalidate(url)
+    # 旧 IP / .local 失效：按已绑定 host/MAC 扫描当前局域网，找到同一盏灯后更新 lamp_url 并重试。
+    if url == config.LAMP_URL:
+        try:
+            from . import discovery
+            item = discovery.rebind_configured_lamp(timeout=3.0)
+            if item:
+                req = urllib.request.Request(
+                    item["url"], data=data, method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with _opener.open(req, timeout=timeout) as resp:
+                    if 200 <= resp.status < 300:
+                        return True
+        except Exception as e:
+            log.debug("lamp rediscovery failed: %s", e)
     # —— WiFi 不可达：BLE 兜底（仅在启用时；默认关闭）——
     if config.BLE_FALLBACK_ENABLED:
         return _send_ble(payload)

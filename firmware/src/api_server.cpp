@@ -1,5 +1,7 @@
 #include <WebServer.h>
+#include <WiFi.h>
 #include <ArduinoJson.h>
+#include <Update.h>
 #include "config.h"
 #include "api_server.h"
 #include "render_engine.h"
@@ -10,6 +12,7 @@ static WebServer server(HTTP_PORT);
 static Session g_sessions[NUM_LEDS > 8 ? NUM_LEDS : 8];
 static uint8_t g_count = 0;
 static uint32_t g_last_ms = 0;
+static bool g_ota_ok = false;
 
 static State parse_state(const char* s) {
   if (!s) return State::IDLE;
@@ -68,9 +71,11 @@ static void handle_state() {
 }
 
 static void handle_health() {
-  char buf[96];
-  snprintf(buf, sizeof(buf), "{\"sessions\":%u,\"uptime_ms\":%lu}",
-          (unsigned)g_count, (unsigned long)millis());
+  char buf[256];
+  snprintf(buf, sizeof(buf),
+          "{\"sessions\":%u,\"uptime_ms\":%lu,\"host\":\"%s\",\"mac\":\"%s\",\"ip\":\"%s\"}",
+          (unsigned)g_count, (unsigned long)millis(),
+          net_hostname(), net_mac(), WiFi.localIP().toString().c_str());
   server.send(200, "application/json", buf);
 }
 
@@ -160,6 +165,49 @@ static void handle_root() {
   server.send_P(200, "text/html", SETTINGS_HTML);
 }
 
+static void handle_update_done() {
+  if (g_ota_ok) {
+    server.send(200, "text/html", "<!doctype html><meta charset=utf-8><p>固件升级成功，正在重启...</p>");
+    delay(300);
+    ESP.restart();
+  } else {
+    String msg = "<!doctype html><meta charset=utf-8><p>固件升级失败：";
+    msg += Update.errorString();
+    msg += "</p><p><a href=/update>返回重试</a></p>";
+    server.send(500, "text/html", msg);
+  }
+}
+
+static void handle_update_upload() {
+  HTTPUpload& upload = server.upload();
+
+  if (upload.status == UPLOAD_FILE_START) {
+    g_ota_ok = false;
+
+    Serial.printf("[ota] 开始升级: %s\n", upload.filename.c_str());
+    uint32_t max_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+    if (!Update.begin(max_space, U_FLASH)) {
+      Serial.printf("[ota] begin 失败: %s\n", Update.errorString());
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (Update.hasError()) return;
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      Serial.printf("[ota] write 失败: %s\n", Update.errorString());
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.hasError()) return;
+    g_ota_ok = Update.end(true);
+    if (g_ota_ok) {
+      Serial.printf("[ota] 升级成功，写入 %u 字节\n", upload.totalSize);
+    } else {
+      Serial.printf("[ota] end 失败: %s\n", Update.errorString());
+    }
+  } else if (upload.status == UPLOAD_FILE_ABORTED) {
+    Update.abort();
+    Serial.println("[ota] 上传中止");
+  }
+}
+
 // —— 软件触发重配网：清 NVS 凭据后重启进配网门户 ——
 static void handle_reset() {
   server.send(200, "text/plain", "resetting wifi, rebooting into setup portal");
@@ -173,6 +221,7 @@ void api_begin() {
   server.on("/settings", HTTP_POST, handle_post_settings);
   server.on("/state", HTTP_POST, handle_state);
   server.on("/health", HTTP_GET, handle_health);
+  server.on("/update", HTTP_POST, handle_update_done, handle_update_upload);
   server.on("/reset", HTTP_POST, handle_reset);   // POST，避免 <img src> 等 CSRF 误触清网
   server.begin();
 }

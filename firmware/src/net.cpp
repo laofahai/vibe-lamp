@@ -11,14 +11,71 @@
 // 下次开机交给 WiFiMulti 自动择优连接——记住多个网、自动挑最强可用的。
 
 static WiFiManager wm;
+static String g_host;
+static String g_mac;
+static String g_ap_name;
+static String g_portal_title;
+static String g_portal_html;
+static WiFiManagerParameter* g_identity_param = nullptr;
 
 // —— 自建多网凭据表的 NVS 存储（与 WiFiManager 自己的 wifi NVS 分开，互不干扰）——
 static const char* CREDS_NS  = "wm_multi";
 static const char* CREDS_KEY = "creds";
 
+static const char* current_host() {
+  if (g_host.length() == 0) {
+    uint64_t mac = ESP.getEfuseMac();
+    char suffix[7];
+    snprintf(suffix, sizeof(suffix), "%06x", (unsigned)(mac & 0xFFFFFF));
+    g_host = String(MDNS_HOST) + "-" + suffix;
+  }
+  return g_host.c_str();
+}
+
+static const char* current_mac() {
+  if (g_mac.length() == 0) {
+    uint8_t mac[6];
+    WiFi.macAddress(mac);
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    g_mac = buf;
+  }
+  return g_mac.c_str();
+}
+
+static const char* portal_ap_name() {
+  if (g_ap_name.length() == 0) {
+    String host = current_host();
+    int dash = host.lastIndexOf('-');
+    String suffix = dash >= 0 ? host.substring(dash + 1) : host;
+    g_ap_name = String(PROV_AP_NAME) + "-" + suffix;
+  }
+  return g_ap_name.c_str();
+}
+
+static void configure_portal_identity() {
+  const char* host = current_host();
+  const char* mac = current_mac();
+  g_portal_title = String("Vibe Lamp ") + host;
+  wm.setTitle(g_portal_title);
+  wm.setHostname(host);
+
+  if (!g_identity_param) {
+    g_portal_html =
+      String("<p><b>设备名</b><br><code>") + host + ".local</code></p>"
+      "<p><b>MAC 地址</b><br><code>" + mac + "</code></p>"
+      "<p>多人同网时，用这个设备名绑定本机守护进程。</p>";
+    g_identity_param = new WiFiManagerParameter(g_portal_html.c_str());
+    wm.addParameter(g_identity_param);
+  }
+}
+
 static void start_mdns() {
-  if (MDNS.begin(MDNS_HOST)) {              // → vibelamp.local
+  const char* host = current_host();
+  if (MDNS.begin(host)) {              // → vibelamp-xxxxxx.local，避免多人局域网撞名
     MDNS.addService("http", "tcp", HTTP_PORT);
+    MDNS.addServiceTxt("http", "tcp", "name", host);
   } else {
     // 注册失败时给出提示，否则用户访问 vibelamp.local 失败时毫无头绪。
     Serial.println("[警告] mDNS 注册失败，请改用 IP 地址访问设备");
@@ -90,6 +147,7 @@ bool net_begin() {
   WiFi.mode(WIFI_STA);
   // 配网门户超时：超时后 autoConnect 返回 false，固件继续跑（进失联态等重配）。
   wm.setConfigPortalTimeout(PROV_PORTAL_TIMEOUT);
+  configure_portal_identity();
 
   WifiCredList creds = load_creds();
   Serial.printf("[net] 多网表载入 %u 条已知网\n", (unsigned)creds.count());
@@ -106,9 +164,9 @@ bool net_begin() {
   //    都把「当前连上的网」导入多网表——于是每配一个新网都被记住，下次 WiFiMulti 自动择优。
   bool ok;
   if (PROV_AP_PASS[0] == '\0') {
-    ok = wm.autoConnect(PROV_AP_NAME);                 // 开放热点
+    ok = wm.autoConnect(portal_ap_name());                 // 开放热点
   } else {
-    ok = wm.autoConnect(PROV_AP_NAME, PROV_AP_PASS);   // 加密热点
+    ok = wm.autoConnect(portal_ap_name(), PROV_AP_PASS);   // 加密热点
   }
   if (ok && WiFi.status() == WL_CONNECTED) {
     Serial.printf("[net] autoConnect 连上 %s（单网/门户），导入多网表\n", WiFi.SSID().c_str());
@@ -121,6 +179,10 @@ bool net_begin() {
 
 bool net_connected() { return WiFi.status() == WL_CONNECTED; }
 
+const char* net_hostname() { return current_host(); }
+
+const char* net_mac() { return current_mac(); }
+
 void net_reset_and_reboot() {
   wm.resetSettings();   // 清 WiFiManager 自己的 wifi NVS 凭据
   clear_creds();        // 清自建多网表（记住的所有网一并清掉）
@@ -129,11 +191,12 @@ void net_reset_and_reboot() {
 }
 
 bool net_start_portal() {
+  configure_portal_identity();
   bool ok;
   if (PROV_AP_PASS[0] == '\0') {
-    ok = wm.startConfigPortal(PROV_AP_NAME);
+    ok = wm.startConfigPortal(portal_ap_name());
   } else {
-    ok = wm.startConfigPortal(PROV_AP_NAME, PROV_AP_PASS);
+    ok = wm.startConfigPortal(portal_ap_name(), PROV_AP_PASS);
   }
   if (ok && WiFi.status() == WL_CONNECTED) {
     WifiCredList creds = load_creds();

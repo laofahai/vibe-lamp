@@ -70,7 +70,7 @@ Rgb animated_color(const Session& s, uint32_t now_ms) {
     case State::NEEDS_YOU:
       return scale(g_settings.col_needs_you, square_wave(e, scaled(1200)));      // 慢闪
     case State::ERROR:
-      return e < scaled(300) ? g_settings.col_error : Rgb{0,0,0};                // 快闪一下
+      return g_settings.col_error;                                               // 错误：红色常亮
     case State::DONE: {
       uint32_t win = scaled(4500);
       if (e >= win) return Rgb{0,0,0};

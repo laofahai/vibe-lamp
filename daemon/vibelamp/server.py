@@ -5,7 +5,8 @@ import threading
 import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from . import config, lamp_client
+from urllib.parse import parse_qs, urlsplit
+from . import config, lamp_client, ota, discovery
 from .model import SessionStore, REMOVE
 from .normalize import transition, codex_transition
 
@@ -146,14 +147,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         # 调试面板（只读观测 + 测试入口），仅本机访问。
-        if self.path in ("/", "/index.html"):
+        path = urlsplit(self.path).path
+        if path in ("/", "/index.html"):
             return self._send(200, "text/html; charset=utf-8",
                               _DASHBOARD_HTML.encode("utf-8"))
-        if self.path == "/api/state":
+        if path == "/api/state":
             return self._send_json(200, _state_payload())
-        if self.path == "/api/events":
+        if path == "/api/events":
             return self._send_json(200, {"events": list(_events)})
-        if self.path == "/healthz":
+        if path == "/api/discover":
+            try:
+                return self._send_json(200, {"devices": discovery.scan(timeout=3.0)})
+            except Exception as e:
+                log.exception("discover failed: %s", e)
+                return self._send_json(500, {"devices": [], "error": str(e)})
+        if path == "/healthz":
             return self._send_json(200, {"ok": True})
         return self._send(404, "text/plain; charset=utf-8", b"not found")
 
@@ -166,12 +174,31 @@ class Handler(BaseHTTPRequestHandler):
         except (TypeError, ValueError):
             length = 0
         body = self.rfile.read(length) if length else b"{}"
+        path = urlsplit(self.path).path
+        if path == "/api/ota":
+            try:
+                qs = parse_qs(urlsplit(self.path).query)
+                filename = (qs.get("filename") or ["firmware.bin"])[0]
+                ok = ota.upload_bytes(body, filename=filename)
+                return self._send_json(200 if ok else 502, {"ok": bool(ok)})
+            except Exception as e:
+                log.exception("ota upload failed: %s", e)
+                return self._send_json(500, {"ok": False, "error": str(e)})
+        if path == "/api/bind":
+            try:
+                item = json.loads(body or b"{}")
+                cfg = discovery.bind(item)
+                _lamp_health["target"] = cfg.get("lamp_url")
+                return self._send_json(200, {"ok": True, "config": cfg})
+            except Exception as e:
+                log.exception("bind failed: %s", e)
+                return self._send_json(500, {"ok": False, "error": str(e)})
         try:
             event = json.loads(body or b"{}")
         except Exception:
             self.send_response(400); self.end_headers(); return
         # 调试面板手动测试：直接钉灯，不进会话模型。
-        if self.path == "/api/test":
+        if path == "/api/test":
             try:
                 result = _apply_test(event)
             except Exception as e:
@@ -179,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = {"ok": False}
             return self._send_json(200, result)
         try:
-            ok = handle_path_event(self.path, event)
+            ok = handle_path_event(path, event)
         except Exception as e:
             log.exception("handle_path_event failed: %s", e)   # 绝不让钩子失败
             ok = True
@@ -278,9 +305,17 @@ td.r{color:#e6edf3}
 button{cursor:pointer;border:1px solid var(--border);background:#21262d;color:var(--fg);
  padding:7px 12px;border-radius:8px;font:inherit}
 button:hover{border-color:#58a6ff}
+.iconbtn{padding:6px 10px;font-size:12px}
 .banner{padding:8px 12px;border-radius:8px;background:#3d2d00;border:1px solid #9e7700;
  color:#f0d68a;display:none}.banner.on{display:block}
 .banner a{color:#f0d68a}
+.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:18px}
+.modal.on{display:flex}
+.dialog{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;
+ width:min(460px,100%);box-shadow:0 18px 60px #000a}
+.dialog h2{margin:0 0 12px;font-size:15px}
+.dialog input{width:100%;box-sizing:border-box;margin:8px 0 12px}
+.dialog .row{display:flex;gap:8px;justify-content:flex-end}
 .dim{color:var(--dim)}.ok{color:#3fb950}.bad{color:#f85149}
 @keyframes breathe{0%,100%{opacity:.35}50%{opacity:1}}
 @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:.12}}
@@ -296,6 +331,8 @@ button:hover{border-color:#58a6ff}
  <div class="li"><b id="lampstate">—</b><span id="lampsub"></span></div>
  <div class="li" style="margin-left:auto;text-align:right">
   <b id="health">链路 —</b><span id="target"></span></div>
+ <button class="iconbtn" onclick="openBind()">绑定</button>
+ <button class="iconbtn" onclick="openOta()">固件</button>
 </header>
 <main>
  <div id="banner" class="banner">🧪 测试模式:灯被钉在测试色,实时状态暂不上灯 —
@@ -307,7 +344,7 @@ button:hover{border-color:#58a6ff}
    <button onclick="test('set','working','search')">🩵 青·检索</button>
    <button onclick="test('set','done','none')">🟢 绿·完成</button>
    <button onclick="test('set','needs_you','none')">🔴 红·该你了</button>
-   <button onclick="test('set','error','none')">🔴 红·错误闪</button>
+   <button onclick="test('set','error','none')">🔴 红·错误常亮</button>
    <button onclick="test('set','off')">⚫ 灭</button>
    <button onclick="test('clear')">↩︎ 恢复实时</button>
   </div></section>
@@ -316,8 +353,27 @@ button:hover{border-color:#58a6ff}
   <tbody id="sessions"></tbody></table></section>
  <section><h2>事件流 · 最近 200 条(新→旧)</h2>
   <table><thead><tr><th>时间</th><th>事件</th><th>会话</th><th>→ 结果</th></tr></thead>
-  <tbody id="events"></tbody></table></section>
+ <tbody id="events"></tbody></table></section>
 </main>
+<div id="otaModal" class="modal" onclick="closeOta(event)">
+ <div class="dialog" onclick="event.stopPropagation()">
+  <h2>固件升级</h2>
+  <div class="dim">上传到当前绑定的灯。请使用 PlatformIO 生成的 firmware.bin，升级时不要断电。</div>
+  <input id="otaFile" type="file" accept=".bin">
+  <div id="otaMsg" class="dim">当前目标见右上角。</div>
+  <div class="row"><button onclick="hideOta()">取消</button><button onclick="otaUpload()">上传</button></div>
+ </div>
+</div>
+<div id="bindModal" class="modal" onclick="closeBind(event)">
+ <div class="dialog" onclick="event.stopPropagation()">
+  <h2>绑定设备</h2>
+  <div class="dim">灯配网成功后，扫描当前局域网。IP 变了也没关系，绑定后会按设备名/MAC 自动找回。</div>
+  <div class="row" style="margin-top:12px"><button onclick="scanDevices()">扫描设备</button></div>
+  <div id="bindMsg" class="dim" style="margin-top:10px">尚未扫描。</div>
+  <div id="deviceList" style="margin-top:10px"></div>
+  <div class="row"><button onclick="hideBind()">关闭</button></div>
+ </div>
+</div>
 <script>
 const COLOR={
  'working/code':['#1e66ff','蓝 · 写码','breathe'],
@@ -326,7 +382,7 @@ const COLOR={
  'working/none':['#1e66ff','蓝 · 工作','breathe'],
  'done/none':['#18c018','绿 · 完成','fade'],
  'needs_you/none':['#ff2828','红 · 该你了','blink'],
- 'error/none':['#ff2828','红 · 错误','flash']};
+ 'error/none':['#ff2828','红 · 错误','']};
 function colorFor(wire){
  const s=((wire&&wire.sessions)||[])[0];
  if(!s) return ['#1c2128','熄灭 · idle',''];
@@ -361,6 +417,48 @@ async function test(action,state,tool){
  try{await fetch('/api/test',{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({action,state,tool})});}catch(e){}
  tick();
+}
+function openOta(){document.getElementById('otaModal').className='modal on';}
+function hideOta(){document.getElementById('otaModal').className='modal';}
+function closeOta(e){if(e.target.id==='otaModal')hideOta();}
+function openBind(){document.getElementById('bindModal').className='modal on';}
+function hideBind(){document.getElementById('bindModal').className='modal';}
+function closeBind(e){if(e.target.id==='bindModal')hideBind();}
+async function scanDevices(){
+ const msg=document.getElementById('bindMsg'), list=document.getElementById('deviceList');
+ msg.textContent='正在扫描当前局域网...'; list.innerHTML='';
+ try{
+  const out=await (await fetch('/api/discover')).json();
+  const ds=out.devices||[];
+  msg.textContent=ds.length?('发现 '+ds.length+' 台设备'):'没有发现设备。确认灯已配网并和 Mac 在同一局域网。';
+  list.innerHTML=ds.map(d=>`<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">
+   <b>${esc(d.host||'')}</b><br><span class="dim">${esc(d.mac||'')} · ${esc(d.ip||'')}</span>
+   <div class="row" style="margin-top:8px"><button onclick='bindDevice(${JSON.stringify(d)})'>绑定这台</button></div>
+  </div>`).join('');
+ }catch(e){msg.textContent='扫描失败：'+e;}
+}
+async function bindDevice(d){
+ const msg=document.getElementById('bindMsg');
+ try{
+  const out=await (await fetch('/api/bind',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})).json();
+  msg.textContent=out.ok?'已绑定 '+d.host+'，后续会自动使用 '+d.ip:'绑定失败';
+  tick();
+ }catch(e){msg.textContent='绑定失败：'+e;}
+}
+async function otaUpload(){
+ const input=document.getElementById('otaFile'), msg=document.getElementById('otaMsg');
+ if(!input.files.length){msg.textContent='请先选择 firmware.bin'; return;}
+ const file=input.files[0];
+ msg.textContent='正在上传 '+file.name+'，不要断电...';
+ try{
+  const res=await fetch('/api/ota?filename='+encodeURIComponent(file.name), {
+   method:'POST',
+   headers:{'Content-Type':'application/octet-stream'},
+   body:await file.arrayBuffer()
+  });
+  const out=await res.json();
+  msg.textContent=out.ok?'上传成功，灯正在重启':'上传失败：守护进程无法把固件传给灯';
+ }catch(e){msg.textContent='上传失败：'+e;}
 }
 tick(); setInterval(tick,1000);
 </script></body></html>"""

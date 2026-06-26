@@ -43,7 +43,7 @@
 #define LEDC_RES  8        // 8 bit：0..255
 
 // —— 网络 ——
-#define MDNS_HOST "vibelamp"          // → vibelamp.local
+#define MDNS_HOST "vibelamp"          // 设备名基准；实际 mDNS 会追加芯片 MAC 后缀，避免多人局域网冲突
 #define HTTP_PORT 80
 #define WATCHDOG_TIMEOUT_MS 30000UL   // 30s 无 /state → 失联
 

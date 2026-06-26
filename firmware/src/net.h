@@ -7,6 +7,12 @@ bool net_begin();
 
 bool net_connected();
 
+// 当前设备的局域网主机名，如 vibelamp-a1b2c3；访问 http://<name>.local
+const char* net_hostname();
+
+// 当前设备 STA MAC 地址，如 aa:bb:cc:dd:ee:ff；用于多人局域网里识别实体设备。
+const char* net_mac();
+
 // 清除已存 WiFi 凭据（NVS）并重启进配网门户。供按钮/HTTP /reset 调用。
 void net_reset_and_reboot();
 

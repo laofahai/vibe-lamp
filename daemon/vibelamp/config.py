@@ -41,6 +41,9 @@ CONFIG_PATH = Path.home() / ".vibelamp" / "config.json"
 _DEFAULTS = {
     # 灯的状态端点（macOS 原生解析 .local）
     "lamp_url": "http://vibelamp.local/state",
+    # 绑定的实体灯身份。IP 会变，host/mac 不应变；daemon 可据此扫描后自动更新 lamp_url。
+    "lamp_id": "",
+    "lamp_mac": "",
     # 心跳间隔（秒）：每 5s 重推（兼做灯重启自愈）
     "heartbeat_sec": 5.0,
     # 推送灯的超时（秒）
@@ -120,11 +123,13 @@ def apply_config():
     模块导入时调用一次（见文件末尾）；改了 CONFIG_PATH / 环境变量后可再调以刷新
     （主要给测试与显式刷新用）。返回最新的配置字典。
     """
-    global LAMP_URL, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
+    global LAMP_URL, LAMP_ID, LAMP_MAC, HEARTBEAT_SEC, PUSH_TIMEOUT_SEC, SESSION_TTL_SEC
     global WORKING_IDLE_TIMEOUT_SEC, WORKING_TOOL_TIMEOUT_SEC
     global BLE_FALLBACK_ENABLED, BLE_BRIDGE_SOCKET, BLE_DEVICE_NAME
     cfg = load_config()
     LAMP_URL = cfg["lamp_url"]
+    LAMP_ID = cfg.get("lamp_id", "")
+    LAMP_MAC = cfg.get("lamp_mac", "")
     HEARTBEAT_SEC = cfg["heartbeat_sec"]
     PUSH_TIMEOUT_SEC = cfg["push_timeout_sec"]
     SESSION_TTL_SEC = cfg["session_ttl_sec"]
