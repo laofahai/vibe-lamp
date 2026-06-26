@@ -21,9 +21,6 @@ from . import config
 
 log = logging.getLogger("vibelamp.ble_bridge")
 
-# bleak 仅在真正建连时才需要；顶层 import 便于 `python -c "import vibelamp.ble_bridge"` 校验环境。
-from bleak import BleakClient, BleakScanner
-
 
 # ——— 纯逻辑（无 BLE IO，可单测）———————————————————————————————
 
@@ -58,18 +55,28 @@ class _BleConnection:
 
     def __init__(self):
         self._client = None
+        self._client_cls = None
+        self._scanner_cls = None
+
+    def _load_bleak(self):
+        """bleak 是可选依赖；只在真正跑 BLE 桥接时加载，避免纯逻辑测试被依赖卡住。"""
+        if self._client_cls is None or self._scanner_cls is None:
+            from bleak import BleakClient, BleakScanner
+            self._client_cls = BleakClient
+            self._scanner_cls = BleakScanner
 
     async def _ensure_connected(self):
         if self._client is not None and self._client.is_connected:
             return True
+        self._load_bleak()
         # 懒连接 / 断线重连：扫到灯才连
-        dev = await BleakScanner.find_device_by_name(
+        dev = await self._scanner_cls.find_device_by_name(
             config.BLE_DEVICE_NAME, timeout=config.BLE_SCAN_TIMEOUT_SEC)
         if dev is None:
             log.debug("ble scan: lamp %s not found", config.BLE_DEVICE_NAME)
             self._client = None
             return False
-        client = BleakClient(dev)
+        client = self._client_cls(dev)
         try:
             await client.connect()
         except Exception as e:
