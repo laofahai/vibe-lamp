@@ -1,9 +1,10 @@
 # macOS
 .DS_Store
 
-# 编辑器
+# 编辑器 / 工具
 .vscode/
 .idea/
+.serena/
 
 # Python（转译器，语言待定）
 __pycache__/
