@@ -55,7 +55,8 @@
 #define PROV_AP_PASS       ""                 // 空 = 开放热点（家用够用；要加密改成 >=8 位）
 #define PROV_PORTAL_TIMEOUT 180               // 配网门户超时（秒）；超时后退出门户继续 loop
 #define WIFI_CONNECT_TIMEOUT_MS 12000UL       // 每轮自动连接已知 WiFi 的最长等待
-#define WIFI_CONNECT_ROUNDS     2             // 多试一轮，避免路由器刚启动/瞬时抖动误进门户
+#define WIFI_CONNECT_ROUNDS     4             // 多试几轮，避免路由器刚启动/瞬时抖动误进门户
+#define WIFI_CONNECT_RETRY_DELAY_MS 1500UL    // 每轮扫描/连接失败后稍等，让射频和路由器稳定
 
 // —— 重配网按钮（开机长按触发 resetSettings + 重开门户）——
 // 用板载 BOOT 按钮（多数经典 ESP32 开发板 = GPIO0，已接上拉，按下拉低）。

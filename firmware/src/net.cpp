@@ -132,19 +132,29 @@ static bool connect_known(const WifiCredList& creds) {
   if (creds.count() == 0) return false;
   WiFiMulti multi;
   for (size_t i = 0; i < creds.count(); ++i) {
+    Serial.printf("[net] 已知 WiFi[%u]: %s\n",
+                  (unsigned)i, creds.get(i).ssid.c_str());
     multi.addAP(creds.get(i).ssid.c_str(), creds.get(i).pass.c_str());
   }
   for (uint8_t round = 0; round < WIFI_CONNECT_ROUNDS; ++round) {
-    if (multi.run(WIFI_CONNECT_TIMEOUT_MS) == WL_CONNECTED) {
+    Serial.printf("[net] 自动连接已知 WiFi，第 %u/%u 轮\n",
+                  (unsigned)(round + 1), (unsigned)WIFI_CONNECT_ROUNDS);
+    wl_status_t st = (wl_status_t)multi.run(WIFI_CONNECT_TIMEOUT_MS);
+    if (st == WL_CONNECTED) {
       Serial.printf("[net] WiFiMulti 自动择优连上已知网: %s\n", WiFi.SSID().c_str());
       return true;
     }
+    Serial.printf("[net] 本轮未连上，WiFi.status=%d\n", (int)st);
+    WiFi.disconnect(false, false);
+    delay(WIFI_CONNECT_RETRY_DELAY_MS);
   }
   return false;
 }
 
 bool net_begin() {
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  delay(500);
   // 配网门户超时：超时后 autoConnect 返回 false，固件继续跑（进失联态等重配）。
   wm.setConfigPortalTimeout(PROV_PORTAL_TIMEOUT);
   configure_portal_identity();
@@ -158,19 +168,20 @@ bool net_begin() {
     return true;
   }
 
-  // 2) 表空 / 已知网都不可用 → 交给 WiFiManager.autoConnect：
-  //    它先用自己 NVS 里存的单网凭据连（天然兼容旧固件、上次配的网——比 WiFi.begin()
-  //    无参可靠），连不上才弹 VibeLamp-Setup 门户。无论旧凭据自动连上、还是门户新配上，
-  //    都把「当前连上的网」导入多网表——于是每配一个新网都被记住，下次 WiFiMulti 自动择优。
+  // 2) 表空 / 已知网都不可用 → 只启动配网门户。
+  //    关键原则：自建多网表是唯一持久化真源；WiFiManager 只做 captive portal UI，
+  //    不再用 autoConnect 读它自己的单网 NVS，避免两套存储出现“门户显示 xinqidian，
+  //    多网表却还是 laofahai”的分裂状态。
   bool ok;
   if (PROV_AP_PASS[0] == '\0') {
-    ok = wm.autoConnect(portal_ap_name());                 // 开放热点
+    ok = wm.startConfigPortal(portal_ap_name());                 // 开放热点
   } else {
-    ok = wm.autoConnect(portal_ap_name(), PROV_AP_PASS);   // 加密热点
+    ok = wm.startConfigPortal(portal_ap_name(), PROV_AP_PASS);   // 加密热点
   }
   if (ok && WiFi.status() == WL_CONNECTED) {
-    Serial.printf("[net] autoConnect 连上 %s（单网/门户），导入多网表\n", WiFi.SSID().c_str());
+    Serial.printf("[net] 门户连上 %s，导入多网表\n", WiFi.SSID().c_str());
     remember_current(creds);
+    wm.resetSettings();                 // 清 WiFiManager 单网 NVS，避免之后再形成第二真源
     start_mdns();
     return true;
   }
@@ -201,6 +212,7 @@ bool net_start_portal() {
   if (ok && WiFi.status() == WL_CONNECTED) {
     WifiCredList creds = load_creds();
     remember_current(creds);                 // 运行时主动重配也追加进表
+    wm.resetSettings();                      // WiFiManager 只做 UI，不保留第二份单网真源
     start_mdns();
   }
   return ok;
