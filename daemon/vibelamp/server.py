@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 from . import config, lamp_client, ota, discovery
 from .model import SessionStore, REMOVE
-from .normalize import transition, codex_transition
+from .normalize import transition, codex_transition, generic_transition
 
 log = logging.getLogger("vibelamp.server")
 store = SessionStore(config.SESSION_TTL_SEC)
@@ -24,6 +24,7 @@ _KNOWN_STATES = {"idle", "working", "done", "error", "needs_you"}
 _ROUTES = {
     "/event": transition,
     "/event/codex": codex_transition,
+    "/event/generic": generic_transition,
 }
 
 # —— 调试面板状态（仅供本机 127.0.0.1 网页观测，纯标准库，不影响推灯主链路）——

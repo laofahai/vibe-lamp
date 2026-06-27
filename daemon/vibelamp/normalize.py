@@ -1,5 +1,6 @@
 from .model import REMOVE
 from . import config as _config
+import re
 
 _CLAUDE_MAP = _config.load_config()["claude_tool_map"]
 
@@ -87,3 +88,68 @@ def codex_transition(event):
     if name == "SessionStart":
         return (sid, "idle", "none")
     return None
+
+
+# —— 通用 agent 接入 ——
+# 给 OpenCode/Qwen/Gemini/Aider/IDE wrapper 先用的稳定入口。调用方可以直接 POST
+# 标准状态，也可以 POST 少量通用事件名；复杂工具后续再补专用 transition。
+_GENERIC_AGENT_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
+_GENERIC_EVENT_STATE = {
+    "start": "working",
+    "session_start": "idle",
+    "prompt": "working",
+    "tool_start": "working",
+    "tool_end": "working",
+    "permission": "needs_you",
+    "approval": "needs_you",
+    "needs_you": "needs_you",
+    "done": "done",
+    "complete": "done",
+    "stop": "done",
+    "error": "error",
+    "fail": "error",
+    "session_end": REMOVE,
+    "remove": REMOVE,
+}
+_GENERIC_TOOLS = {"none", "code", "command", "search"}
+
+
+def _generic_agent_name(raw):
+    name = str(raw or "generic").strip().lower()
+    name = _GENERIC_AGENT_RE.sub("-", name).strip("-._")
+    return name or "generic"
+
+
+def _generic_state(event):
+    state = event.get("state")
+    if state:
+        return str(state).strip().lower()
+    name = event.get("event") or event.get("type") or event.get("hook_event_name")
+    if not name:
+        return None
+    return _GENERIC_EVENT_STATE.get(str(name).strip().lower())
+
+
+def _generic_tool(event):
+    tool = str(event.get("tool") or "none").strip().lower()
+    return tool if tool in _GENERIC_TOOLS else "code"
+
+
+def generic_transition(event):
+    """通用事件 JSON → (session_id, state, tool)；返回 None 表示忽略。
+
+    标准载荷示例：
+      {"agent":"opencode","session_id":"abc","state":"working","tool":"command"}
+
+    简化事件示例：
+      {"agent":"qwen","session_id":"abc","event":"permission"}
+    """
+    if not isinstance(event, dict):
+        return None
+    state = _generic_state(event)
+    if state is None:
+        return None
+    agent = _generic_agent_name(event.get("agent"))
+    raw_sid = event.get("session_id") or event.get("thread_id") or event.get("conversation_id")
+    sid = f"{agent}:{raw_sid or 'default'}"
+    return (sid, state, _generic_tool(event))

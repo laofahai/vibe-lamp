@@ -29,6 +29,14 @@ def test_route_event_codex_to_codex(monkeypatch):
     assert pushed[-1] == {"sessions": [{"state": "working", "tool": "command"}]}
 
 
+def test_route_event_generic(monkeypatch):
+    store, pushed = _fresh_store(monkeypatch)
+    server.handle_path_event("/event/generic",
+        {"agent": "opencode", "session_id": "abc", "state": "working", "tool": "search"})
+    assert "opencode:abc" in store._sessions
+    assert pushed[-1] == {"sessions": [{"state": "working", "tool": "search"}]}
+
+
 def test_two_agents_coexist_namespaced(monkeypatch):
     store, pushed = _fresh_store(monkeypatch)
     server.handle_path_event("/event",
@@ -39,6 +47,17 @@ def test_two_agents_coexist_namespaced(monkeypatch):
     assert set(store._sessions) == {"claude:x", "codex:x"}
     states = [s["state"] for s in store.to_wire()["sessions"]]
     assert states == ["needs_you", "working"]   # needs_you 优先在前
+
+
+def test_generic_agent_coexists_with_existing_agents(monkeypatch):
+    store, pushed = _fresh_store(monkeypatch)
+    server.handle_path_event("/event",
+        {"hook_event_name": "PreToolUse", "session_id": "x", "tool_name": "Edit"})
+    server.handle_path_event("/event/generic",
+        {"agent": "qwen", "session_id": "x", "event": "permission"})
+    assert set(store._sessions) == {"claude:x", "qwen:x"}
+    states = [s["state"] for s in store.to_wire()["sessions"]]
+    assert states == ["needs_you", "working"]
 
 
 def test_unknown_path_returns_none(monkeypatch):

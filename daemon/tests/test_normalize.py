@@ -1,5 +1,6 @@
 from vibelamp.normalize import (transition, classify_tool,
-                                codex_transition, classify_codex_tool)
+                                codex_transition, classify_codex_tool,
+                                generic_transition)
 from vibelamp.model import REMOVE
 
 def test_classify_tool():
@@ -108,3 +109,31 @@ def test_classify_tool_uses_config_map(monkeypatch):
     monkeypatch.setattr(normalize, "_CLAUDE_MAP", {"FooTool": "command"})
     assert normalize.classify_tool("FooTool") == "command"
     assert normalize.classify_tool("Unknown") == "code"   # 缺省仍 code
+
+
+def test_generic_direct_state():
+    assert generic_transition({"agent": "opencode", "session_id": "s1",
+                               "state": "working", "tool": "command"}) \
+        == ("opencode:s1", "working", "command")
+
+
+def test_generic_event_alias_permission():
+    assert generic_transition({"agent": "qwen", "session_id": "abc",
+                               "event": "permission"}) \
+        == ("qwen:abc", "needs_you", "none")
+
+
+def test_generic_sanitizes_agent_name_and_tool():
+    assert generic_transition({"agent": "Trae IDE", "session_id": "x",
+                               "state": "working", "tool": "unknown"}) \
+        == ("trae-ide:x", "working", "code")
+
+
+def test_generic_remove_event():
+    assert generic_transition({"agent": "aider", "session_id": "s1",
+                               "event": "session_end"}) \
+        == ("aider:s1", REMOVE, "none")
+
+
+def test_generic_missing_state_or_event_ignored():
+    assert generic_transition({"agent": "opencode", "session_id": "s1"}) is None
