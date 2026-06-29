@@ -57,6 +57,7 @@
 #define WIFI_CONNECT_TIMEOUT_MS 12000UL       // 每轮自动连接已知 WiFi 的最长等待
 #define WIFI_CONNECT_ROUNDS     4             // 多试几轮，避免路由器刚启动/瞬时抖动误进门户
 #define WIFI_CONNECT_RETRY_DELAY_MS 1500UL    // 每轮扫描/连接失败后稍等，让射频和路由器稳定
+#define PROV_CONNECT_TIMEOUT    20            // 门户提交后连接新 WiFi 的最长等待（秒），避免卡在保存页
 
 // —— 重配网按钮（开机长按触发 resetSettings + 重开门户）——
 // 用板载 BOOT 按钮（多数经典 ESP32 开发板 = GPIO0，已接上拉，按下拉低）。
