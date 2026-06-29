@@ -3,6 +3,7 @@ Comment,Designator,Footprint,LCSC Part #
 100nF,"C4,C5,C7",C_0603_1608Metric,
 10k,R5,R_0603_1608Metric,
 10uF,C3,C_0805_2012Metric,
+1N4148WS,D3,SOD-323_L1.8-W1.3-LS2.5-RD,C2128
 1uF,"C1,C2",C_0603_1608Metric,
 330,R4,R_0603_1608Metric,
 5.1k,"R6,R7",R_0603_1608Metric,
