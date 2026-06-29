@@ -18,8 +18,9 @@ HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
                "PostToolUseFailure", "Notification", "Stop", "SessionEnd"]
 
 SETTINGS = Path.home() / ".claude" / "settings.json"
-PLIST = Path.home() / "Library" / "LaunchAgents" / "com.vibelamp.daemon.plist"
-LABEL = "com.vibelamp.daemon"
+APP_ID = "tech.linch.vibelamp"
+PLIST = Path.home() / "Library" / "LaunchAgents" / f"{APP_ID}.plist"
+LABEL = APP_ID
 
 
 def _our_block():
@@ -80,7 +81,7 @@ def _save_settings(settings):
 def _write_plist():
     daemon_dir = str(Path(__file__).resolve().parent)
     log_dir = str(Path.home() / "Library" / "Logs")
-    tmpl = (Path(daemon_dir) / "com.vibelamp.daemon.plist.template").read_text()
+    tmpl = (Path(daemon_dir) / "tech.linch.vibelamp.plist.template").read_text()
     PLIST.parent.mkdir(parents=True, exist_ok=True)
     PLIST.write_text(tmpl.format(
         PYTHON=sys.executable, DAEMON_DIR=daemon_dir, LOG_DIR=log_dir))

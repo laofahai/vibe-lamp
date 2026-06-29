@@ -65,8 +65,8 @@ def package_daemon(dist, tag):
         zf.write(ROOT / "README.md", "README.md")
         zf.write(ROOT / "daemon" / "install.py", "daemon/install.py")
         zf.write(ROOT / "daemon" / "pyproject.toml", "daemon/pyproject.toml")
-        zf.write(ROOT / "daemon" / "com.vibelamp.daemon.plist.template",
-                 "daemon/com.vibelamp.daemon.plist.template")
+        zf.write(ROOT / "daemon" / "tech.linch.vibelamp.plist.template",
+                 "daemon/tech.linch.vibelamp.plist.template")
         add_tree(zf, ROOT / "daemon" / "vibelamp", "daemon/vibelamp",
                  excludes=("__pycache__",))
         add_tree(zf, ROOT / "daemon" / "tests", "daemon/tests",
