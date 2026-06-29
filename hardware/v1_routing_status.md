@@ -37,6 +37,23 @@
 2. 手工补 1 条未连、微调 5 处热焊盘、挪开 1 对近距元件；
 3. DRC 归零后 `kicad-cli pcb export gerbers / drill`，导 BOM+CPL 下单。
 
+## 打板厂要的文件（已生成在 `fab/`）
+
+打板厂**不收 .kicad_pcb**，要的是制造格式。已用 kicad-cli 导出：
+
+| 文件 | 用途 | 谁要 |
+|---|---|---|
+| `vibe_lamp_core_v1-gerber.zip` | Gerber 各层 + Excellon 钻孔 | **PCB 打板**：直接上传 JLCPCB |
+| `vibe_lamp_core_v1-bom.csv` | 物料表(Comment/Designator/Footprint/LCSC#) | **SMT 贴片** |
+| `vibe_lamp_core_v1-cpl.csv` | 贴片坐标(Designator/x/y/rot/layer) | **SMT 贴片** |
+
+> 流程：JLCPCB 下单 → 上传 gerber.zip → 选 PCBA → 传 bom.csv + cpl.csv。
+
+### ⚠️ 下单前仍需收尾（当前是草稿，先别真下单）
+- **CC2 这 1 条未布通**必须补上（USB-C 的 CC2 下拉，缺了会导致只有一个插向能供电）。在密集的 USB-C 区，脚本自动补会撞短路，建议在 KiCad 里手工拉一条（1 分钟）或交布线服务。
+- BOM 里**被动件(R/C)、RGB LED、按键、排针的 LCSC 料号待填**（U1/U2/J1/D2 已填）；R/C 在 JLCPCB 选基础库按值匹配即可。
+- 余下 ~22 项 DRC 多为 USB-C 连接器固有密脚间距 + 丝印，非阻断；DRC 归零后重导 gerber 再下单。
+
 ## 复现命令
 
 ```bash

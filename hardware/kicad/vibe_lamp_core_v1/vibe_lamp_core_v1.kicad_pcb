@@ -104,7 +104,7 @@
 				)
 			)
 		)
-		(property "Value" "PinHeader_1x03_P2.54mm_Vertical"
+		(property "Value" "WS2812-EXT-1x3"
 			(at 0 7.46 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -341,7 +341,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "5.1k"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -488,7 +488,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0603_1608Metric"
+		(property "Value" "1uF"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -635,7 +635,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0805_2012Metric"
+		(property "Value" "470uF"
 			(at 0 1.68 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -980,7 +980,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0603_1608Metric"
+		(property "Value" "100nF"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -1127,7 +1127,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "0R"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -1274,7 +1274,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0603_1608Metric"
+		(property "Value" "1uF"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -1419,7 +1419,7 @@
 				)
 			)
 		)
-		(property "Value" "SOT-25-5_L2.9-W1.6-P0.95-LS2.8-BL"
+		(property "Value" "AP2112K-3.3"
 			(at 0 5.3 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -1655,7 +1655,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "150"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -1901,7 +1901,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "10k"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -2048,7 +2048,7 @@
 				)
 			)
 		)
-		(property "Value" "LED_RGB_5050-6"
+		(property "Value" "RGB-LED-5050-CC"
 			(at 0 3.3 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -2303,7 +2303,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0805_2012Metric"
+		(property "Value" "10uF"
 			(at 0 1.68 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -2450,7 +2450,7 @@
 				)
 			)
 		)
-		(property "Value" "C_0603_1608Metric"
+		(property "Value" "100nF"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -2595,7 +2595,7 @@
 				)
 			)
 		)
-		(property "Value" "USB-C_SMD-TYPE-C-31-M-12_1"
+		(property "Value" "USB-C-TYPE-C-31-M-12"
 			(at 0 6.474 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -3103,7 +3103,7 @@
 				)
 			)
 		)
-		(property "Value" "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL"
+		(property "Value" "USBLC6-2SC6"
 			(at 0 5.149 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -3323,7 +3323,7 @@
 				)
 			)
 		)
-		(property "Value" "WIFIM-SMD_ESP32-C3-MINI-1"
+		(property "Value" "ESP32-C3-MINI-1"
 			(at 0 8.95 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -3958,7 +3958,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "150"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -4204,7 +4204,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "470"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -4351,7 +4351,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "330"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -4498,7 +4498,7 @@
 				)
 			)
 		)
-		(property "Value" "R_0603_1608Metric"
+		(property "Value" "5.1k"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -4645,7 +4645,7 @@
 				)
 			)
 		)
-		(property "Value" "Panasonic_EVQPUJ_EVQPUA"
+		(property "Value" "SW-PUSH"
 			(at 0 3.5 0)
 			(layer "F.Fab")
 			(hide yes)
