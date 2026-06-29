@@ -109,8 +109,8 @@
 
 1. 接线(单颗 RGB LED 或 WS2812 灯环)。
 2. 烧录固件:`cd firmware && pio run -e esp32 -t upload`。
-3. 配网:手机连 `VibeLamp-Setup` 热点 → 浏览器自动弹配网页 → 填家里 WiFi 密码。
-4. 手动点灯自测:`curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`。
+3. 配网:手机连 `VibeLamp-Setup-<id>` 热点(每台灯的热点名与 mDNS 名都带 MAC 后 6 位十六进制后缀) → 浏览器自动弹配网页 → 填家里 WiFi 密码。
+4. 手动点灯自测(用灯的实际设备名 `vibelamp-<id>.local`,配网页会显示,或直接用它的 IP):`curl -X POST http://vibelamp-<id>.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`。
 5. 接入真实会话:`cd daemon && python install.py install`,然后开 Claude Code / Codex 跑任务看灯。
 
 ---
@@ -155,10 +155,10 @@ pio run -e esp32 -t upload && pio device monitor
 
 **已完成**
 - ✅ 设计文档(三层架构、状态模型、显示驱动抽象、断线处理、自定义设置)。
-- ✅ ESP32 固件:联网 + mDNS(`vibelamp.local`)、HTTP `/state` `/health`、看门狗失联、四种显示硬件抽象、多会话分段、全套状态动效、开机动画。**14 个 native 测试全绿,`esp32` / `esp32_ring` / `esp32_ble` 三 env 编译通过。**
-- ✅ Python 守护进程:会话合并、心跳、超时兜底、推送重试、launchd 自启;Claude Code + Codex 钩子接入(含 Codex)。**57 个 pytest 全绿。**
-- ✅ WiFiManager 网页配网(连 `VibeLamp-Setup` 热点,浏览器配网,凭据存 NVS,断电不丢)。
-- ✅ 用户自定义设置:灯自带设置网页(亮度/颜色/动画,存 NVS,访问 `http://vibelamp.local/`)+ 守护进程配置文件 `~/.vibelamp/config.json`。
+- ✅ ESP32 固件:联网 + 按设备分名的 mDNS(`vibelamp-<id>.local`)、HTTP `/state` `/health`、看门狗失联、四种显示硬件抽象、多会话分段、全套状态动效、开机动画。**14 个 native 测试全绿,`esp32` / `esp32_ring` / `esp32_ble` 三 env 编译通过。**
+- ✅ Python 守护进程:会话合并、心跳、超时兜底、推送重试、自动重发现(推送失败时按 `lamp_id`/`lamp_mac` 重扫局域网,灯换 IP 或你切换 WiFi 后都能自动找回)、launchd 自启;Claude Code + Codex 钩子接入(含 Codex)。**57 个 pytest 全绿。**
+- ✅ WiFi 配网 + 多网自动连接:NVS 里的自建多网凭据表是唯一真源;开机扫描周围 AP、挑信号最强的已知网连接(Mesh 友好:兼容一个 SSID 多 BSSID、对仅 WPA 的老 AP 放宽最低安全级、多轮重试)。WiFiManager 只负责配网门户 UI(`VibeLamp-Setup-<id>` 热点,浏览器配网,凭据存 NVS 断电不丢)。
+- ✅ 用户自定义设置:灯自带设置网页(亮度/颜色/动画,存 NVS,访问 `http://vibelamp-<id>.local/`)+ 守护进程配置文件 `~/.vibelamp/config.json`。
 
 **待做(v1.1+)**
 - ⏳ **计划 04 — BLE**:WiFi 断时切 BLE 兜底推送(双通道冗余)+ 乐鑫官方 App BLE 配网。
@@ -194,7 +194,7 @@ vibe-lamp/
 
 - **守护进程**:Python(仅标准库,零第三方依赖),macOS launchd 自启。
 - **固件**:PlatformIO + Arduino-ESP32(core 2.0.17)、FastLED、ArduinoJson、WiFiManager。
-- **寻址**:mDNS `vibelamp.local`(macOS 原生解析,无需额外软件)。
+- **寻址**:按设备分名的 mDNS `vibelamp-<id>.local`(带 MAC 后 6 位十六进制后缀,多人同网不撞名)。守护进程主要靠局域网扫描(`/api/discover`)找灯,以 `lamp_id` + `lamp_mac` 为稳定身份;mDNS/IP 变了也能自动重绑。
 
 设计文档:[superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
 

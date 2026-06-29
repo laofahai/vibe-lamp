@@ -119,9 +119,9 @@ pio run -e esp32_ring -t upload
    ```bash
    pio device monitor
    ```
-   首次开机（NVS 里没凭据）串口会打印 WiFiManager 起配网门户的日志，ESP32 出现一个 WiFi 热点 **`VibeLamp-Setup`**。
+   首次开机（NVS 里没凭据）串口会打印 WiFiManager 起配网门户的日志，ESP32 出现一个 WiFi 热点 **`VibeLamp-Setup-<后缀>`**（每台灯的热点名带自己 MAC 的后 6 位十六进制后缀，避免多台同名）。
 
-2. 手机或电脑连上 `VibeLamp-Setup`（开放热点，无密码）。系统通常会**自动弹出配网网页**；若没弹，浏览器手动访问 `http://192.168.4.1`。
+2. 手机或电脑连上 `VibeLamp-Setup-<后缀>`（开放热点，无密码）。系统通常会**自动弹出配网网页**；若没弹，浏览器手动访问 `http://192.168.4.1`。配网页顶部会显示这台灯的**设备名 `vibelamp-<后缀>.local` 与 MAC**——记下它，多人同网时用来区分自己的灯。
 
 3. 点 **Configure WiFi** → 选你家 WiFi → 填密码 → **Save**。
 
@@ -131,13 +131,15 @@ pio run -e esp32_ring -t upload
    ```
    （也能在路由器后台看到这台新设备上线。）
 
+   > **设备名带 MAC 后缀**：mDNS 实际注册的是 `vibelamp-<后缀>.local`（如 `vibelamp-ab7834.local`），**不是**固定的 `vibelamp.local`——多人同网才不会撞名。上面串口横幅里打印的 `vibelamp.local` 不带后缀、未必能直接解析；最稳的是用串口里的 **IP**，或配网页/下文里的 `vibelamp-<后缀>.local`。
+
 5. 在 Mac 上验证能解析到它（macOS 原生支持 `.local`）：
    ```bash
-   ping vibelamp.local
+   ping vibelamp-<后缀>.local    # 把 <后缀> 换成你这台灯的实际后缀；或直接 ping 串口里的 IP
    ```
    能 ping 通即配网成功。
 
-> **凭据持久**：拔电再上电不会再弹配网，直接连上家里 WiFi（存在 NVS，断电不丢）。换网/搬家时见下面第 8 节重配。
+> **凭据持久 + 多网记忆**：拔电再上电不会再弹配网（凭据存 NVS，断电不丢）。固件把配过的网络都记进**自建多网表**（NVS 里的唯一真源），开机时扫描周围 AP、挑信号最强的已知网连接（兼容一个 SSID 多 AP 的 Mesh，多轮重试），连不上才重开配网门户。换网/搬家见下面第 8 节。
 
 ---
 
@@ -149,7 +151,7 @@ pio run -e esp32_ring -t upload
 > - `-H 'Content-Type: application/json'` —— 不带的话 `curl -d` 默认按表单类型发送，固件解析不到 JSON 会返回 **400 bad json**。
 > - `--noproxy '*'` —— 你的 Mac 若设了系统代理（HTTP_PROXY 等），curl 会把发往局域网灯的请求也走代理 → **502**。带上它强制直连。没设代理时它是无害的空操作，留着即可。
 >
-> 下面每条都已带上这两个 flag，复制即用。
+> 下面每条都已带上这两个 flag，复制即用。命令里的 `vibelamp.local` 是**占位符**——换成你这台灯的实际设备名 `vibelamp-<后缀>.local`（见第 3 节，配网页/串口里有）或它的 IP，否则解析不到。
 
 ```bash
 # 干活中 → 蓝呼吸
@@ -202,7 +204,7 @@ python install.py install
 这一步会（幂等，可重复运行，保留你已有配置）：
 - 把钩子写入 Claude Code 的 `~/.claude/settings.json`（一行 `curl`，带 `--max-time 1 || true`，绝不拖慢 agent）。
 - 把钩子写入 Codex 的 `~/.codex/hooks.json` 并在 `~/.codex/config.toml` 追加 notify。
-- 装一个 launchd LaunchAgent（`~/Library/LaunchAgents/com.vibelamp.daemon.plist`），守护进程开机自启、崩溃自动重拉。
+- 装一个 launchd LaunchAgent（`~/Library/LaunchAgents/tech.linch.vibelamp.plist`，label `tech.linch.vibelamp`），守护进程开机自启、崩溃自动重拉。
 - 生成默认配置文件（工具分色规则、会话超时等，可编辑）。
 
 装好后，**开一个 Claude Code 或 Codex 会话跑个任务**：
@@ -238,7 +240,7 @@ http://vibelamp.local/
 
 ### 连不上 WiFi / 想重新配网
 - 设备始终连不上、或换了路由器：让它重进配网门户，两种办法任选：
-  - **开机长按按钮**：断电 → 按住板载 **BOOT 键**（GPIO0）→ 上电并保持约 **3 秒** → 串口打印「重置 WiFi 凭据」并重启 → 重新出现 `VibeLamp-Setup` 热点，按第 3 节重配一次。
+  - **开机长按按钮**：断电 → 按住板载 **BOOT 键**（GPIO0）→ 上电并保持约 **3 秒** → 串口打印「重置 WiFi 凭据」并重启 → 重新出现 `VibeLamp-Setup-<后缀>` 热点，按第 3 节重配一次。
   - **HTTP 软触发**（设备还在线时）：执行
     ```bash
     curl -X POST http://vibelamp.local/reset
@@ -248,7 +250,7 @@ http://vibelamp.local/
 
 ### 灯不亮，查什么
 - **串口先看**：`pio device monitor`，确认有没有 `WiFi OK` 和 `IP`。没连上 WiFi 自然收不到推送。
-- `ping vibelamp.local` 不通 → mDNS 没起来或没连网，回到第 3 节重配网。
+- `ping vibelamp-<后缀>.local`（或串口里的 IP）不通 → mDNS 没起来或没连网，回到第 3 节重配网。
 - `curl .../state` 返回了但灯不动：
   - RGB LED 版：确认是**共阴**且公共脚接 GND（共阳要在驱动里反相）；R/G/B 三脚和 GPIO25/26/27 没接错、限流电阻没虚接。
   - 灯环版：确认数据线接的是 **DIN**（不是 DOUT）、方向箭头对、5V/GND 没接反、电容极性没接反。
@@ -266,10 +268,12 @@ http://vibelamp.local/
   cd daemon && python -m vibelamp
   ```
 - 确认钩子真的装进去了：检查 `~/.claude/settings.json` 里有指向 `127.0.0.1:8787/event` 的 `curl` 钩子。
-- 灯地址不对：守护进程默认推 `vibelamp.local`，解析不到时回退固定 IP——在 `~/.vibelamp/config.json` 里核对灯地址。
+- 灯地址不对：守护进程绑定灯的稳定身份是 `lamp_id`（设备名）+ `lamp_mac`，IP 变了也不怕。推送失败时它会按这身份**重扫当前 /24 局域网**找回同一盏灯并自动更新 `lamp_url`（弱信号偶发整轮扫空时最多自动重扫 3 轮）。在 `~/.vibelamp/config.json` 里核对 `lamp_id` / `lamp_mac` / `lamp_url`。
 
 ---
 
 ## 8. 换网 / 搬家
 
-不用重烧、不用拆机：按上面「重新配网」的**开机长按 BOOT 键 3 秒**或 `curl -X POST http://vibelamp.local/reset`，清掉旧凭据重进 `VibeLamp-Setup` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。
+**灯要换 WiFi**：不用重烧、不用拆机。按上面「重新配网」的**开机长按 BOOT 键 3 秒**或 `curl -X POST http://vibelamp-<后缀>.local/reset`（占位符换成实际设备名或 IP），清掉旧凭据重进 `VibeLamp-Setup-<后缀>` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。
+
+**你的 Mac 换 WiFi**：随时切，无需任何操作。守护进程推送失败会自动按 `lamp_id`/`lamp_mac` 重扫新子网把灯找回并更新地址；弱信号偶发整轮扫空时最多自动重扫 3 轮，掉个包补一轮就抓回来。

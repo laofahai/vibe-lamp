@@ -109,8 +109,8 @@ Follow **[HARDWARE.md](HARDWARE.md)** end to end and the lamp will track real se
 
 1. Wire it up (single RGB LED, or a WS2812 ring).
 2. Flash the firmware: `cd firmware && pio run -e esp32 -t upload`.
-3. WiFi setup: connect your phone to the `VibeLamp-Setup` hotspot → the captive portal pops up → enter your home WiFi password.
-4. Manual light-up self-test: `curl -X POST http://vibelamp.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`.
+3. WiFi setup: connect your phone to the `VibeLamp-Setup-<id>` hotspot (each lamp's AP and mDNS name carry a 6-hex suffix from its MAC) → the captive portal pops up → enter your home WiFi password.
+4. Manual light-up self-test (use the lamp's per-device name `vibelamp-<id>.local`, shown on the portal, or its IP): `curl -X POST http://vibelamp-<id>.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`.
 5. Hook into real sessions: `cd daemon && python install.py install`, then run a task in Claude Code / Codex and watch the lamp.
 
 ---
@@ -155,10 +155,10 @@ The design doc + 5 implementation plans are complete and public. Current progres
 
 **Done**
 - ✅ Design doc (three-layer architecture, state model, display-driver abstraction, disconnection handling, custom settings).
-- ✅ ESP32 firmware: networking + mDNS (`vibelamp.local`), HTTP `/state` `/health`, watchdog lost-detection, four display-hardware abstractions, multi-session segmentation, the full set of state animations, boot animation. **All 14 native tests green; `esp32` / `esp32_ring` / `esp32_ble` all compile.**
-- ✅ Python daemon: session merge, heartbeat, timeout fallback, push retry, launchd autostart; Claude Code + Codex hook integration (Codex included). **All 57 pytest green.**
-- ✅ WiFiManager web provisioning (connect to the `VibeLamp-Setup` hotspot, configure in browser, credentials stored in NVS, survive power loss).
-- ✅ User customization: the lamp's own settings page (brightness / color / animation, stored in NVS, at `http://vibelamp.local/`) + daemon config file `~/.vibelamp/config.json`.
+- ✅ ESP32 firmware: networking + per-device mDNS (`vibelamp-<id>.local`), HTTP `/state` `/health`, watchdog lost-detection, four display-hardware abstractions, multi-session segmentation, the full set of state animations, boot animation. **All 14 native tests green; `esp32` / `esp32_ring` / `esp32_ble` all compile.**
+- ✅ Python daemon: session merge, heartbeat, timeout fallback, push retry, auto-rediscovery (on push failure it re-scans the LAN by `lamp_id`/`lamp_mac`, so the lamp is re-found after an IP change or after you switch WiFi networks), launchd autostart; Claude Code + Codex hook integration (Codex included). **All 57 pytest green.**
+- ✅ WiFi provisioning + multi-network connect: a self-managed multi-network credential table in NVS is the single source of truth; on boot the firmware scans nearby APs and connects to the strongest known network (mesh-aware: handles one SSID spread across multiple BSSIDs, relaxes min security for WPA-only APs, retries across rounds). WiFiManager only serves the captive-portal UI (`VibeLamp-Setup-<id>` hotspot, configure in browser, credentials survive power loss).
+- ✅ User customization: the lamp's own settings page (brightness / color / animation, stored in NVS, at `http://vibelamp-<id>.local/`) + daemon config file `~/.vibelamp/config.json`.
 
 **To do (v1.1+)**
 - ⏳ **Plan 04 — BLE**: fall back to BLE push when WiFi drops (dual-channel redundancy) + Espressif official-app BLE provisioning.
@@ -194,7 +194,7 @@ vibe-lamp/
 
 - **Daemon**: Python (stdlib only, zero third-party deps), macOS launchd autostart.
 - **Firmware**: PlatformIO + Arduino-ESP32 (core 2.0.17), FastLED, ArduinoJson, WiFiManager.
-- **Addressing**: mDNS `vibelamp.local` (resolved natively by macOS, no extra software needed).
+- **Addressing**: per-device mDNS `vibelamp-<id>.local` (a 6-hex MAC suffix avoids name clashes on shared networks). The daemon's primary way to find the lamp is a LAN scan (`/api/discover`), keyed on `lamp_id` + `lamp_mac` as the stable identity, so mDNS/IP can change and it re-binds automatically.
 
 Design doc: [superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
 
