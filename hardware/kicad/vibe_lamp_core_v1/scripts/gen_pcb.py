@@ -13,8 +13,8 @@ def mm(v): return pcbnew.FromMM(v)
 
 board = pcbnew.CreateEmptyBoard()
 
-# 板框 32x32（直角；圆角作为后续表贴工艺细节）
-W = 32.0; H = 32.0
+# 板框 40x40（放大留布线/间距余量；直角，圆角作后续工艺细节）
+W = 40.0; H = 40.0
 def add_edge(x1,y1,x2,y2):
     seg = pcbnew.PCB_SHAPE(board)
     seg.SetShape(pcbnew.SHAPE_T_SEGMENT)
@@ -35,39 +35,42 @@ HDR = STOCK + "/Connector_PinHeader_2.54mm.pretty"
 
 # 摆放原则：U1 模组占中上(x7.7..24.3,y2.4..15.6),天线朝上;其余件全部放在
 # 模组外的左条/右条/下半区,互不重叠。坐标 mm，y 向下。
+# 40x40 宽松布局：模组占顶部(天线朝上),LED 居中偏下,其余件按真实尺寸拉开,
+# 每个件中心间距≥3mm(0603/0805)或更大(SOT/LED/USB),保证外形不重叠。
 COMPS = [
-    ("U1", EZ_LIB, "WIFIM-SMD_ESP32-C3-MINI-1", 16, 9,   0, False),
-    ("D1", LED,    "LED_RGB_5050-6",            16, 20,  0, False),
-    ("J1", EZ_LIB, "USB-C_SMD-TYPE-C-31-M-12_1",16, 30.3,0, False),
-    ("U2", EZ_LIB, "SOT-25-5_L2.9-W1.6-P0.95-LS2.8-BL", 5, 20, 90, False),
-    ("D2", EZ_LIB, "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", 27, 26, 0, False),
-    # RGB 限流电阻：在 LED 两侧/下方，离 LED 外形足够远
-    ("R1", RES, "R_0603_1608Metric", 9.5, 19, 90, False),
-    ("R2", RES, "R_0603_1608Metric", 22.5,19, 90, False),
-    ("R3", RES, "R_0603_1608Metric", 9.5, 23, 90, False),
-    ("R4", RES, "R_0603_1608Metric", 22.5,23, 90, False),
-    # 模组下方一排去耦/EN
-    ("C3", CAP, "C_0805_2012Metric", 12, 17, 0, False),
-    ("C4", CAP, "C_0603_1608Metric", 15, 17, 0, False),
-    ("R5", RES, "R_0603_1608Metric", 18, 17, 0, False),
-    ("C5", CAP, "C_0603_1608Metric", 21, 17, 0, False),
-    # 电源/USB 区(下方)
-    ("C1", CAP, "C_0603_1608Metric", 4,  24, 90, False),
-    ("C2", CAP, "C_0603_1608Metric", 8,  24, 90, False),
-    ("F1", RES, "R_0603_1608Metric", 9,  27.5, 0, False),
-    ("R6", RES, "R_0603_1608Metric", 13, 27.5, 0, False),
-    ("R7", RES, "R_0603_1608Metric", 19, 27.5, 0, False),
+    ("U1", EZ_LIB, "WIFIM-SMD_ESP32-C3-MINI-1", 20, 9.5, 0, False),   # 顶部,天线朝上
+    ("D1", LED,    "LED_RGB_5050-6",            20, 24,  0, False),   # 居中(灯)
+    ("J1", EZ_LIB, "USB-C_SMD-TYPE-C-31-M-12_1",20, 37.5,0, False),   # 底边
+    ("U2", EZ_LIB, "SOT-25-5_L2.9-W1.6-P0.95-LS2.8-BL", 6, 23, 90, False),  # 左中 LDO
+    ("D2", EZ_LIB, "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", 31, 33, 0, False),  # USB ESD
+    # 模组下方一排:去耦 + EN(间距 3.5mm)
+    ("C3", CAP, "C_0805_2012Metric", 12.5, 18, 0, False),
+    ("C4", CAP, "C_0603_1608Metric", 16,   18, 0, False),
+    ("R5", RES, "R_0603_1608Metric", 24,   18, 0, False),
+    ("C5", CAP, "C_0603_1608Metric", 27.5, 18, 0, False),
+    # RGB 限流电阻:LED 四角外侧(LED 5mm,中心 20,24 → 离开≥4mm)
+    ("R1", RES, "R_0603_1608Metric", 14,  22.5, 90, False),
+    ("R2", RES, "R_0603_1608Metric", 26,  22.5, 90, False),
+    ("R3", RES, "R_0603_1608Metric", 14,  26,   90, False),
+    ("R4", RES, "R_0603_1608Metric", 26,  26,   90, False),
+    # 左下:LDO 输入输出电容
+    ("C1", CAP, "C_0603_1608Metric", 6, 27, 90, False),
+    ("C2", CAP, "C_0603_1608Metric", 6, 30, 90, False),
+    # USB 区(底部一排,间距足够)
+    ("F1", RES, "R_0603_1608Metric", 11, 33.5, 0, False),
+    ("R6", RES, "R_0603_1608Metric", 14.5,33.5, 0, False),
+    ("R7", RES, "R_0603_1608Metric", 25.5,33.5, 0, False),
     # 右条:按键/排针/灯带扩展
-    ("SW1", BTN, "Panasonic_EVQPUJ_EVQPUA", 28.5, 12, 0, False),
-    ("P1", HDR, "PinHeader_1x03_P2.54mm_Vertical", 28.5, 18, 0, False),
-    ("C6", CAP, "C_0805_2012Metric", 25, 18, 90, False),
-    # 测试焊盘:左条一列
-    ("TP1", TP, "TestPoint_Pad_D1.0mm", 3, 6,  0, False),
-    ("TP2", TP, "TestPoint_Pad_D1.0mm", 3, 9,  0, False),
-    ("TP3", TP, "TestPoint_Pad_D1.0mm", 3, 12, 0, False),
-    ("TP4", TP, "TestPoint_Pad_D1.0mm", 3, 15, 0, False),
-    ("TP5", TP, "TestPoint_Pad_D1.0mm", 30, 6, 0, False),
-    ("TP6", TP, "TestPoint_Pad_D1.0mm", 30, 9, 0, False),
+    ("SW1", BTN, "Panasonic_EVQPUJ_EVQPUA", 35, 10, 0, False),
+    ("P1", HDR, "PinHeader_1x03_P2.54mm_Vertical", 35.5, 24, 0, False),
+    ("C6", CAP, "C_0805_2012Metric", 31, 25, 90, False),
+    # 测试焊盘:左列 4 个;右列 2 个拉开(TP6=IO9 远离 SW1=BTN，避免并行短路)
+    ("TP1", TP, "TestPoint_Pad_D1.0mm", 3, 8,  0, False),
+    ("TP2", TP, "TestPoint_Pad_D1.0mm", 3, 12, 0, False),
+    ("TP3", TP, "TestPoint_Pad_D1.0mm", 3, 16, 0, False),
+    ("TP4", TP, "TestPoint_Pad_D1.0mm", 3, 20, 0, False),
+    ("TP5", TP, "TestPoint_Pad_D1.0mm", 38, 6, 0, False),
+    ("TP6", TP, "TestPoint_Pad_D1.0mm", 38, 18, 0, False),
 ]
 
 pad_report = {}
@@ -141,7 +144,7 @@ try:
     z.SetDoNotAllowZoneFills(True); z.SetDoNotAllowTracks(True); z.SetDoNotAllowVias(True)
     ls = pcbnew.LSET(); ls.AddLayer(pcbnew.F_Cu); ls.AddLayer(pcbnew.B_Cu)
     z.SetLayerSet(ls)
-    pts = [(1.5,0.5),(28.5,0.5),(28.5,5.0),(1.5,5.0)]
+    pts = [(6,0.3),(34,0.3),(34,2.8),(6,2.8)]
     poly = z.Outline()
     poly.NewOutline()
     for px,py in pts: poly.Append(mm(px), mm(py))

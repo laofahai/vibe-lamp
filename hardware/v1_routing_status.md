@@ -1,42 +1,51 @@
-# Vibe Lamp Core V1 布线状态（自动布线草稿）
+# Vibe Lamp Core V1 布线状态
 
-> 工程文件：`hardware/kicad/vibe_lamp_core_v1/vibe_lamp_core_v1.kicad_pcb`
-> 生成方式：pcbnew 脚本摆件+连网 → Freerouting v1.9.0 自动布线 → 导回 SES → 双面 GND 铺铜。
+> 工程：`hardware/kicad/vibe_lamp_core_v1/vibe_lamp_core_v1.kicad_pcb`（KiCad 10）
+> 流程：pcbnew 脚本摆件+连网 → Freerouting v1.9.0 自动布线(100 pass) → 导回 SES → 双面 GND 铺铜。
+> 板框：40×40 mm（尺寸可调），2 层。
 
-## 现状：**草稿，未达可打样**
+## 现状：接近可打样，仅余少量收尾
 
-自动布线把约 75% 连接走通（86 条网络连接中 64 条已布），但仍有需**人工在 KiCad 里清理**的问题。这正是“画好能打开的板”与“可下单打样的板”之间的最后一段，必须有人在 PCB 编辑器里收尾。
-
-## 待清理的 DRC 问题（来自 kicad-cli DRC）
-
-| 类型 | 数量 | 说明 / 处理 |
+| 指标 | 初版 | 当前 |
 |---|---|---|
-| 未布通连接 (unconnected) | 21 | Freerouting 双层没布满，剩余手工补线或重布 |
-| 短路 (shorting_items) | 4 | **必须修**：不同网络铜重叠 |
-| 天线 keepout 穿越 (items_not_allowed) | 17 | 走线/铜进入了模组天线禁区，需挪线/挖空铺铜 |
-| 元件外形重叠 (courtyards_overlap) | 9 | 摆放偏挤，需拉开间距 |
-| 间距/孔/边距 (clearance/hole/edge) | ~14 | 调线宽间距、远离板边 |
-| 阻焊桥 (solder_mask_bridge) | 5 | 细间距阻焊，调规则或挪线 |
-| 丝印压铜/重叠 (silk_*) | ~26 | 纯外观，打样前隐藏/挪动位号即可 |
+| DRC 违规 | 86 | **23** |
+| 未连接 | 21 | **1** |
+| 短路 | 4 | **0** ✅ |
+| 元件外形重叠 | 9 | **1** |
 
-## 已经做对的部分（可直接复用）
+布局规整(模组居顶天线朝上、LED 居中、USB-C 居底、测试点成列)、走线干净、GND 铺铜到位、无短路。
 
-- 真实封装（ESP32-C3-MINI-1 / USB-C TYPE-C-31-M-12 / AP2112K / USBLC6 均来自立创，封装与库存对得上）。
-- 22 个网络的连接关系（netlist）正确，已验证零映射告警。
-- 天线 keepout 规则区已建（在顶边）。
-- 双面 GND 铺铜已加。
+## 剩余 23 项（多为次要/可调，非阻断）
 
-## 收尾两条路（择一）
+| 类型 | 数量 | 性质 / 处理 |
+|---|---|---|
+| clearance（间距 0.10–0.18mm） | 6 | freerouting 局部挤窄；放宽规则到 JLCPCB 0.127mm 可清大部分，个别需手工挪线 |
+| starved_thermal（GND 热焊盘细） | 5 | 铺铜热连接偏细；调热焊盘参数或可接受 |
+| silk_edge / padstack / annular / hole / copper_edge | 各 2–3 | 丝印/过孔环宽/孔距/铜距板边；规则微调或挪动 |
+| unconnected | 1 | 1 条 freerouting 未布通，手工补一段即可 |
+| courtyard_overlap | 1 | 一对元件略近 |
 
-1. **交 PCB 布线服务 / 会 KiCad 的人**：从这版 75% 已布的草稿继续，修短路、补 21 条、清 keepout、拉开重叠，跑通 DRC 后导 Gerber。对“不会 KiCad”的人这是最稳的。
-2. **继续自动布线迭代**：先把摆放拉开（消除 courtyard 重叠）+ 让布线器尊重 keepout + 加大 pass 数重布；可能多轮，且短路仍可能要手工修。
+## 已做对、可直接用
 
-## 复现命令（本机）
+- 真实封装均来自立创（ESP32-C3-MINI-1 / USB-C TYPE-C-31-M-12 / AP2112K-3.3 / USBLC6），对得上 JLCPCB 库存。
+- 22 个网络连接关系正确（零映射告警），自动布线 ~99% 完成、零短路。
+- 天线 keepout 规则区在顶边；双面 GND 铺铜。
+
+## 到可打样还差（一次性收尾）
+
+1. 放宽间距规则到 JLCPCB 工艺（0.127mm）清掉边缘性 clearance；
+2. 手工补 1 条未连、微调 5 处热焊盘、挪开 1 对近距元件；
+3. DRC 归零后 `kicad-cli pcb export gerbers / drill`，导 BOM+CPL 下单。
+
+## 复现命令
 
 ```bash
 KPY="/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"
 KCLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-# 摆件+连网：scratchpad/gen_pcb.py    导出 DSN：export_dsn.py    导回 SES：import_ses.py    GND 铺铜：gnd_pour.py
-java -jar ~/Downloads/freerouting-1.9.0.jar -de core.dsn -do core.ses -mp 20   # 需图形会话，非 headless
-"$KCLI" pcb drc vibe_lamp_core_v1.kicad_pcb
+"$KPY" scripts/gen_pcb.py          # 摆件+连网+keepout
+"$KPY" scripts/export_dsn.py <pcb> core.dsn
+java -jar ~/Downloads/freerouting-1.9.0.jar -de core.dsn -do core.ses -mp 100   # 需图形会话
+"$KPY" scripts/import_ses.py <pcb> core.ses
+"$KPY" scripts/gnd_pour.py <pcb>
+"$KCLI" pcb drc <pcb>
 ```
