@@ -24,3 +24,13 @@ dist/
 secrets.h
 wifi_credentials.*
 *.local
+
+# KiCad 工作/生成文件
+*.kicad_prl
+*.lck
+~*.lck
+*-backups/
+.history/
+fp-info-cache
+# 3D STEP 模型体积大且打样不需要（保留 .wrl 供 KiCad 预览）
+hardware/kicad/**/*.step
