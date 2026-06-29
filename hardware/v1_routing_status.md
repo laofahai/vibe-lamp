@@ -4,59 +4,59 @@
 > 流程：pcbnew 脚本摆件+连网 → Freerouting v1.9.0 自动布线 → 导回 SES → CC2 手补 → 双面 GND 铺铜 → JLCPCB 工艺规则 DRC。
 > 板框：40×40 mm，2 层。
 
-## 现状：电气完整,可打样（草稿待定 D1 选型）
+## 现状：✅ 电气完整、BOM 齐料、可下单 PCBA
 
-| 指标 | 旧 | 当前 |
-|---|---|---|
-| 短路 | 0 | **0** ✅ |
-| 未连接 | 1 (CC2) | **0** ✅ |
-| DRC 违规 | 24 | **20**（全次要,见下） |
+| 指标 | 结果 |
+|---|---|
+| 短路 | **0** ✅ |
+| 未连接 | **0** ✅ |
+| DRC 违规 | **18**（全部非阻断:10 个 USB-C 连接器固有 + 8 个 cosmetic 丝印） |
+| BOM 关键料号 | **6/6 已填**(U1/U2/J1/D2/D1/SW1),被动件 JLCPCB 自动匹配 |
 
-本轮改动：
-- **CC2 已布通**：把 R7（CC2 下拉）移到 J1.B5 正北空走廊,CC2 成一条 1.41mm 直线手补,0 短路。
-- **J1 上移 1.2mm**：USB-C 焊盘全部进板内,外壳仍 overhang 可插线（修掉焊盘出板边）。
-- **USB-C 扇出口袋扩到 ~3.8mm**：底排被动件上移,给连接器扇出留道。
-- **品牌丝印 "vibe lamp"**：正面（F.SilkS, LED 上方）+ 背面大字（B.SilkS）+ 背面 "v1"。
-- **设计规则设为 JLCPCB 工艺**：铜到板边 0.5→0.2mm、默认间距 0.2→0.127mm。
+## 关键设计决策：D1 改用 WS2812B 数字灯
 
-## 剩余 20 项 DRC（全部非阻断）
+实查立创库后定的最优解(详见 git 历史):
+- **6 脚 5050 模拟共阴 RGB 立创无现成高库存料**(模拟 5050 基本是 8 脚 RGBW 或带 IC 数字灯)。
+- 改用 **WS2812B(C2761795,库存 55 万)**:单线驱动、去掉 R1/R2/R3 三个限流电阻、立创现货充足、24 位色、颜色一致。
+- 数据链:`GPIO4 → R4(330Ω) → D1.DIN`;`D1.DOUT → P1`(板载 D1 是链首,P1 可级联外部灯带)。
+- 新增 **C7 100nF** 给 D1 就近去耦。
+- SW1 清网键改用 **SKRPABE010(C115360,库存 1.8万)**——Panasonic SMD 轻触开关现货,封装实测对得上。
+- 配套固件:**新增 env `c3_core_v1`**(WS2812 单灯,GPIO4,NUM_LEDS=1)。**不影响现有 SuperMini 模拟板(env `c3_rgb`)**。
+
+## 本轮其它改动
+
+- **CC2 已布通**：R7 移到 J1.B5 正北空走廊,CC2 走一条 1.41mm 直线(`scripts/route_cc2.py`),0 短路。
+- **J1 上移 1.2mm**:USB-C 焊盘全进板内,外壳仍 overhang 可插线。
+- **品牌丝印 "vibe lamp"**:正面 + 背面大字 + 背面 "v1"。
+- **设计规则 = JLCPCB 工艺**:铜到板边 0.2mm、默认间距 0.127mm、最少热焊盘臂 1。
+
+## 剩余 18 项 DRC（全部非阻断）
 
 | 类型 | 数量 | 性质 |
 |---|---|---|
-| hole_clearance / annular_width / clearance / padstack | 10 | **USB-C 连接器（立创 C165948）固有密脚间距/PTH**,立创自家封装,他们能稳定制造 |
-| silk_edge_clearance | 5 | U1/J1 封装丝印超出板边（贴边器件天经地义,超出部分不印）——cosmetic |
-| silk_overlap / silk_over_copper | 3 | C6 位号丝印与邻件/铺铜重叠——cosmetic（与品牌丝印无关,后者干净） |
-| courtyards_overlap | 1 | TP5 与 SW1 课程框略近 |
-| starved_thermal | 1 | D2 一个 GND 热焊盘连接偏细 |
+| hole_clearance / annular_width / clearance / padstack | 10 | **USB-C 连接器(立创 C165948)固有密脚/PTH**,立创自家封装,稳定可造 |
+| silk_edge_clearance | 5 | U1/J1 封装丝印超出板边(贴边器件,超出部分不印)——cosmetic |
+| silk_overlap / silk_over_copper | 3 | C6 位号丝印与邻件/铺铜重叠——cosmetic |
 
-> 这些是**对 KiCad 通用规则的告警**,不是真缺陷；连接器固有项 + cosmetic 丝印,JLCPCB 上传时会按自家工艺二次检查。可在 KiCad 里逐条 “Exclude” 标记确认。
+> 均为对 KiCad 通用规则的告警,**无真实设计缺陷**;JLCPCB 上传时会按自家工艺二次检查。可在 KiCad 逐条 Exclude 确认。
 
 ## WiFi 天线
 
-ESP32-C3-MINI-1 **自带 PCB 天线 + 射频匹配,无需单独天线元件**。模组置顶,天线端朝板顶边；顶边 keep-out 规则区（y0.3–2.8mm,无铜/无走线/无过孔）已在位。
+ESP32-C3-MINI-1 **自带 PCB 天线 + 射频匹配,无需单独天线元件**。模组置顶、天线端朝板顶边;顶边 keep-out 规则区(y0.3–2.8mm,无铜/无走线/无过孔)在位。
 
-## 打板厂要的文件（已重新导出在 `fab/`）
+## ⚠️ 注意:下单/编辑前请关闭 KiCad
+
+KiCad 开着此工程时会**自动回写 `.kicad_pro`**,把设计规则还原成默认(铜到板边 0.5、间距 0.2),导致 DRC 假阳性变多。下单前如需重跑 DRC,请先关 KiCad,或确认 `.kicad_pro` 里 `min_copper_edge_clearance=0.2 / clearance=0.127 / min_resolved_spokes=1`。
+
+## 打板厂要的文件（已生成在 `fab/`）
 
 | 文件 | 用途 |
 |---|---|
-| `vibe_lamp_core_v1-gerber.zip` | Gerber 10 层（双面铜/阻焊/丝印 + 板框 + 钢网 + Excellon 钻孔）→ 上传 JLCPCB |
-| `vibe_lamp_core_v1-bom.csv` | 物料表（JLCPCB 原生格式 Comment/Designator/Footprint/LCSC#）|
+| `vibe_lamp_core_v1-gerber.zip` | Gerber 10 层(双面铜/阻焊/丝印 + 板框 + 钢网 + Excellon 钻孔)→ 上传 JLCPCB |
+| `vibe_lamp_core_v1-bom.csv` | 物料表(JLCPCB 原生格式,6 个关键料号已填) |
 | `vibe_lamp_core_v1-cpl.csv` | 贴片坐标 |
 
-> 流程：JLCPCB 下单 → 上传 gerber.zip → 选 PCBA → 传 bom.csv + cpl.csv。
-
-### ⚠️ 下单前的 BOM 收尾（实查立创库后的结论）
-
-已填确切立创料号：**U1=C2934569**(ESP32-C3-MINI-1)、**U2=C51118**(AP2112K-3.3)、**J1=C165948**(USB-C)、**D2=C7519**(USBLC6-2SC6)。
-
-仍待定 / 需你确认：
-- **D1（RGB 灯）——需选型决策**。当前封装是 `LED_RGB_5050-6`（6 脚 5050）。实查 JLCPCB 库：模拟 5050 现货几乎都是 **8 脚 RGBW**（如 C440461）或**带 IC 的数字灯**（WS2812/SK6812 类,如 C5380879）；**6 脚纯模拟共阴 5050 没有现成高库存料**。三选一：
-  1. 改用 6 脚小封装共阴 RGB（如 SMD-6P 1.6×1.5 的 C375568）→ 需换 D1 封装 + 局部重布；
-  2. 改用 WS2812B/SK6812 数字灯（单线驱动,固件改成走 WS2812 协议,板上 R1/R2/R3 限流电阻取消）→ 元件少、立创现货足,但要改固件;
-  3. 维持 6 脚 5050,自行采购模拟共阴 5050 手焊 / 找贴片厂代采。
-  （反例：C482558 虽是共阴 RGB,但实为 SMD-4P 3×1.5,**与 6 脚封装对不上**,别选。）
-- **SW1（按键）**：封装 `Panasonic_EVQPUJ_EVQPUA`。在 JLCPCB 选 4 脚贴片轻触开关并**确认 land pattern 对得上**（候选 C10852 4×4×1.7 SMD-4P,库存偏低需复核）。
-- **被动件 R/C/0Ω**：BOM 留空即可,**JLCPCB 下单界面会按“值+封装”自动匹配基础库**,你点确认；无需预填 C 号（自己猜反而易错）。
+> 流程:JLCPCB 下单 → 上传 gerber.zip → 选 PCBA → 传 bom.csv + cpl.csv → 被动件(R/C/0Ω)在界面按值确认基础库即可。
 
 ## 复现命令
 
@@ -70,8 +70,8 @@ java -jar ~/Downloads/freerouting-1.9.0.jar -de core.dsn -do core.ses -mp 100   
 "$KPY" scripts/import_ses.py $PCB core.ses
 "$KPY" scripts/route_cc2.py $PCB                  # 手补 CC2 直线(B5→R7.1)
 "$KPY" scripts/gnd_pour.py $PCB
-"$KPY" scripts/set_values.py $PCB                 # 写回元件值(470/150/1uF…)
-# .kicad_pro: min_copper_edge_clearance=0.2, Default class clearance=0.127
+"$KPY" scripts/set_values.py $PCB                 # 写回元件值
+# .kicad_pro: min_copper_edge_clearance=0.2, Default clearance=0.127, min_resolved_spokes=1
 "$KCLI" pcb drc --refill-zones --severity-all $PCB
 "$KCLI" pcb export gerbers -o fab/ $PCB
 "$KCLI" pcb export drill --format excellon --excellon-units mm -o fab/ $PCB

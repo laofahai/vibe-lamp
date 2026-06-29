@@ -11,7 +11,8 @@
 #define DISPLAY_TYPE DISPLAY_RGB_LED
 #endif
 
-// —— 像素数 ——
+// —— 像素数（可由 build_flag -DNUM_LEDS 覆盖，例如 Core V1 板单颗 WS2812 用 1）——
+#ifndef NUM_LEDS
 #if DISPLAY_TYPE == DISPLAY_RGB_LED
   #define NUM_LEDS 1
 #elif DISPLAY_TYPE == DISPLAY_WS2812_RING
@@ -20,6 +21,7 @@
   #define NUM_LEDS 8
 #else
   #define NUM_LEDS 3
+#endif
 #endif
 
 // —— 引脚 ——
