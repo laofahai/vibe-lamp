@@ -46,8 +46,8 @@ _DEFAULTS = {
     "lamp_mac": "",
     # 心跳间隔（秒）：每 5s 重推（兼做灯重启自愈）
     "heartbeat_sec": 5.0,
-    # 推送灯的超时（秒）
-    "push_timeout_sec": 1.0,
+    # 推送灯的超时（秒）：弱信号灯响应可达 ~1s，留足余量避免压线超时误报「灯失联」
+    "push_timeout_sec": 2.5,
     # 无活动多久算死会话（秒）：30min 兜底清理
     "session_ttl_sec": 1800,
     # 活动会话静默多久就降级 idle 灭灯（秒）——ESC/kill 不发任何钩子，灯会卡住，靠此自愈。
