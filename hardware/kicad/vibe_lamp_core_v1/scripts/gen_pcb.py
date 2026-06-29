@@ -40,9 +40,9 @@ HDR = STOCK + "/Connector_PinHeader_2.54mm.pretty"
 COMPS = [
     ("U1", EZ_LIB, "WIFIM-SMD_ESP32-C3-MINI-1", 20, 9.5, 0, False),   # 顶部,天线朝上
     ("D1", LED,    "LED_RGB_5050-6",            20, 24,  0, False),   # 居中(灯)
-    ("J1", EZ_LIB, "USB-C_SMD-TYPE-C-31-M-12_1",20, 37.5,0, False),   # 底边
+    ("J1", EZ_LIB, "USB-C_SMD-TYPE-C-31-M-12_1",20, 36.3,0, False),   # 底边(上移1.2:焊盘进板,外壳仍overhang可插线)
     ("U2", EZ_LIB, "SOT-25-5_L2.9-W1.6-P0.95-LS2.8-BL", 6, 23, 90, False),  # 左中 LDO
-    ("D2", EZ_LIB, "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", 31, 33, 0, False),  # USB ESD
+    ("D2", EZ_LIB, "SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", 31, 30, 0, False),  # USB ESD(上移,靠USB)
     # 模组下方一排:去耦 + EN(间距 3.5mm)
     ("C3", CAP, "C_0805_2012Metric", 12.5, 18, 0, False),
     ("C4", CAP, "C_0603_1608Metric", 16,   18, 0, False),
@@ -56,10 +56,10 @@ COMPS = [
     # 左下:LDO 输入输出电容
     ("C1", CAP, "C_0603_1608Metric", 6, 27, 90, False),
     ("C2", CAP, "C_0603_1608Metric", 6, 30, 90, False),
-    # USB 区(底部一排,间距足够)
-    ("F1", RES, "R_0603_1608Metric", 11, 33.5, 0, False),
-    ("R6", RES, "R_0603_1608Metric", 14.5,33.5, 0, False),
-    ("R7", RES, "R_0603_1608Metric", 25.5,33.5, 0, False),
+    # USB 区:上移到 y30,给 USB-C 扇出腾出 ~3.8mm 走线口袋(原 1.5mm 太挤,CC2 布不通)
+    ("F1", RES, "R_0603_1608Metric", 10, 30, 0, False),
+    ("R6", RES, "R_0603_1608Metric", 13, 30, 0, False),   # CC1 下拉
+    ("R7", RES, "R_0603_1608Metric", 21.75, 31.6, 90, False),   # CC2 下拉:放 B5 正北空走廊,CC2=1.5mm直线必通
     # 右条:按键/排针/灯带扩展
     ("SW1", BTN, "Panasonic_EVQPUJ_EVQPUA", 35, 10, 0, False),
     ("P1", HDR, "PinHeader_1x03_P2.54mm_Vertical", 35.5, 24, 0, False),
@@ -152,6 +152,28 @@ try:
     print("keepout ok")
 except Exception as e:
     print("keepout skip:", e)
+
+# ---- 品牌丝印 "vibe lamp" ----
+def add_silk(text, x, y, size, layer, mirror=False, thick=0.15):
+    try:
+        t = pcbnew.PCB_TEXT(board)
+        t.SetText(text)
+        t.SetLayer(layer)
+        t.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
+        t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+        t.SetTextThickness(mm(thick))
+        try: t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
+        except Exception: pass
+        if mirror:
+            try: t.SetMirrored(True)
+            except Exception: pass
+        board.Add(t)
+        print(f"silk '{text}' @({x},{y}) layer={layer}", flush=True)
+    except Exception as e:
+        print("silk skip:", e, flush=True)
+add_silk("vibe lamp", 20, 28.6, 1.1, pcbnew.F_SilkS)               # 正面小标(LED 与底排之间空区)
+add_silk("vibe lamp", 20, 20.0, 1.8, pcbnew.B_SilkS, mirror=True)  # 背面主标(背面空,大字)
+add_silk("v1",        20, 23.0, 1.0, pcbnew.B_SilkS, mirror=True)  # 背面版本号
 
 board.BuildListOfNets()
 board.BuildConnectivity()
