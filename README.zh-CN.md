@@ -9,6 +9,12 @@
 
 > **但不依赖、也无需安装 Vibe Island。** Vibe Lamp 直接读各 agent 自己的钩子(Claude Code `~/.claude/settings.json`、Codex `~/.codex/hooks.json`)拿状态,和 Vibe Island 是各自独立的「钩子消费者」。两者可以共存(钩子会各跑各的),也可以只装其一。
 
+<p align="center">
+  <img src="hardware/kicad/vibe_lamp_core_v1/renders/vibe_lamp_core_v1-iso.png" alt="Vibe Lamp Core V1 PCB 3D render" width="680">
+</p>
+
+Core V1 是一块完整的桌面状态灯主控板:ESP32-C3、USB-C 供电/烧录、板载 WS2812B 状态灯、清网/配网按钮,并预留外接 WS2812 灯环/灯带焊盘。KiCad 工程里已经包含 PCB 源文件、3D 渲染图、JLCPCB Gerber、BOM 与 CPL 贴片坐标。
+
 ---
 
 ## 它解决什么
@@ -87,19 +93,47 @@
 
 ---
 
-## 硬件清单
+## 硬件
 
-打样只要一颗 RGB LED 就能验证完整的色彩与动效模型;想要多会话分段显示再上 WS2812 灯环。
+本项目支持两条硬件路径:
 
-| 部件 | 打样(最简) | 成品(可选升级) |
+1. **Core V1 PCBA** —— 仓库里的正式主板。推荐按这条做成品:下单已生成的打板/贴片文件,烧录固件,配网,再装进扩散罩或外壳。
+2. **面包板原型** —— 适合固件调试或快速验证,用 ESP32 开发板加一颗 RGB LED 或 WS2812 灯环即可。
+
+<p align="center">
+  <img src="hardware/kicad/vibe_lamp_core_v1/renders/vibe_lamp_core_v1-top.png" alt="Vibe Lamp Core V1 PCB top render" width="520">
+</p>
+
+| 部件 | 面包板原型 | Core V1 PCBA |
 |---|---|---|
-| 主控 | 手上的 ESP32 开发板 | ESP32-C3 SuperMini / XIAO ESP32-C3(更小更便宜,功能零差别) |
-| 显示 | 单颗**共阴 RGB LED**(3 路 PWM) | WS2812 灯环(16 灯) |
-| 配件 | 面包板、杜邦线、3 个 ~220Ω 限流电阻 | WS2812 数据线串 ~330Ω 电阻、电源并 ~1000µF 电容 |
-| 扩散 | 无(裸灯即可) | 乳白亚克力扩散罩 / 白色 PLA 3D 打印外壳 |
+| 主控 | ESP32 开发板 / ESP32-C3 开发板 | ESP32-C3-MINI-1 模组 |
+| 显示 | 单颗 RGB LED 或 WS2812 灯环 | 板载 WS2812B,预留外接 WS2812 焊盘 |
+| 装配 | 面包板、杜邦线、电阻 | 工厂 SMT 贴片 PCBA,主板无需用户焊接 |
+| 生产文件 | 不需要 | KiCad 源文件 + `fab/` Gerber/BOM/CPL |
 | 供电 | USB | USB |
 
-> 详细接线、引脚、烧录、配网、点灯自测,见 **[HARDWARE.md](HARDWARE.md)**。
+面包板 RGB 原型物料:
+
+| 物料 | 数量 | 备注 |
+|---|---:|---|
+| ESP32 开发板 | 1 | 兼容 `esp32dev` 的常见开发板即可 |
+| 共阴 RGB LED | 1 | 4 脚:公共阴极 + R/G/B 三脚 |
+| 220 欧姆电阻 | 3 | R/G/B 每路一颗限流电阻 |
+| 面包板 | 1 | 快速点亮验证 |
+| 杜邦线 | 若干 | 按开发板接口选择 |
+| USB 数据线 | 1 | 供电 + 烧录 |
+
+面包板 WS2812 灯环原型物料:
+
+| 物料 | 数量 | 备注 |
+|---|---:|---|
+| ESP32 开发板 | 1 | 同一套固件,换显示 env |
+| WS2812 / WS2812B 灯环 | 1 | 默认测试目标是 16 颗灯 |
+| 330 欧姆电阻 | 1 | 串在 DIN 数据线上 |
+| 1000 uF 电解电容 | 1 | 并在 5V 与 GND 之间,注意极性 |
+| 杜邦线 + USB 数据线 | 若干 | 供电、数据、烧录 |
+
+接线图、Core V1 生产说明、烧录、配网、点灯自测,见 **[HARDWARE.md](HARDWARE.md)**。
 
 ---
 
@@ -107,8 +141,8 @@
 
 跟着 **[HARDWARE.md](HARDWARE.md)** 走一遍,今晚就能让灯随真实会话变色,大致是:
 
-1. 接线(单颗 RGB LED 或 WS2812 灯环)。
-2. 烧录固件:`cd firmware && pio run -e esp32 -t upload`。
+1. 使用 Core V1 PCBA,或按面包板 RGB / WS2812 原型接线。
+2. 烧录固件:Core V1 用 `cd firmware && pio run -e c3_core_v1 -t upload`;原始 ESP32 RGB 原型用 `pio run -e esp32 -t upload`。
 3. 配网:手机连 `VibeLamp-Setup-<id>` 热点(每台灯的热点名与 mDNS 名都带 MAC 后 6 位十六进制后缀) → 浏览器自动弹配网页 → 填家里 WiFi 密码。
 4. 手动点灯自测(用灯的实际设备名 `vibelamp-<id>.local`,配网页会显示,或直接用它的 IP):`curl -X POST http://vibelamp-<id>.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`。
 5. 接入真实会话:`cd daemon && python install.py install`,然后开 Claude Code / Codex 跑任务看灯。
@@ -135,7 +169,10 @@ cd firmware
 # 跑渲染引擎纯逻辑单测(14 个,无需开发板)
 pio test -e native
 
-# 编译上板固件(单颗 RGB LED 版)
+# 编译 Core V1 主板固件
+pio run -e c3_core_v1
+
+# 编译原始单颗 RGB LED 原型固件
 pio run -e esp32
 
 # 编译灯环版
@@ -151,14 +188,14 @@ pio run -e esp32 -t upload && pio device monitor
 
 ## 项目状态 / 路线图
 
-设计文档 + 5 份实现计划已完成并公开。当前进度:
+当前进度:
 
 **已完成**
-- ✅ 设计文档(三层架构、状态模型、显示驱动抽象、断线处理、自定义设置)。
 - ✅ ESP32 固件:联网 + 按设备分名的 mDNS(`vibelamp-<id>.local`)、HTTP `/state` `/health`、看门狗失联、四种显示硬件抽象、多会话分段、全套状态动效、开机动画。**14 个 native 测试全绿,`esp32` / `esp32_ring` / `esp32_ble` 三 env 编译通过。**
 - ✅ Python 守护进程:会话合并、心跳、超时兜底、推送重试、自动重发现(推送失败时按 `lamp_id`/`lamp_mac` 重扫局域网,灯换 IP 或你切换 WiFi 后都能自动找回)、launchd 自启;Claude Code + Codex 钩子接入(含 Codex)。**57 个 pytest 全绿。**
 - ✅ WiFi 配网 + 多网自动连接:NVS 里的自建多网凭据表是唯一真源;开机扫描周围 AP、挑信号最强的已知网连接(Mesh 友好:兼容一个 SSID 多 BSSID、对仅 WPA 的老 AP 放宽最低安全级、多轮重试)。WiFiManager 只负责配网门户 UI(`VibeLamp-Setup-<id>` 热点,浏览器配网,凭据存 NVS 断电不丢)。
 - ✅ 用户自定义设置:灯自带设置网页(亮度/颜色/动画,存 NVS,访问 `http://vibelamp-<id>.local/`)+ 守护进程配置文件 `~/.vibelamp/config.json`。
+- ✅ Core V1 硬件:KiCad 主板源文件、3D 渲染图、JLCPCB Gerber/BOM/CPL 输出、布线/DRC 状态已放在 `hardware/kicad/vibe_lamp_core_v1/`。
 
 **待做(v1.1+)**
 - ⏳ **计划 04 — BLE**:WiFi 断时切 BLE 兜底推送(双通道冗余)+ 乐鑫官方 App BLE 配网。
@@ -174,8 +211,9 @@ vibe-lamp/
 ├── README.md                  # 英文(GitHub 首页)
 ├── README.zh-CN.md            # 本文件(中文)
 ├── HARDWARE.md                # 今晚照着做的硬件上手指南
+├── hardware/                  # Core V1 规格、接线图、KiCad 源文件、生产文件
 ├── firmware/                  # ESP32 固件(PlatformIO)
-│   ├── platformio.ini         #   env:esp32 / esp32_ring / esp32_ble / native
+│   ├── platformio.ini         #   env:c3_core_v1 / esp32 / esp32_ring / esp32_ble / native
 │   ├── include/config.h       #   引脚、灯数、超时、mDNS 名、亮度上限
 │   ├── src/                   #   渲染引擎 + 显示驱动 + 网络 + HTTP API
 │   └── test/                  #   渲染引擎 native 单测
@@ -183,9 +221,7 @@ vibe-lamp/
 │   ├── install.py             #   幂等装钩子 + launchd + Codex 配置
 │   ├── vibelamp/              #   服务器、会话合并、推灯客户端、配置
 │   └── tests/                 #   pytest
-└── superpowers/               # 设计文档与实现计划
-    ├── specs/                 #   总设计
-    └── plans/                 #   5 份实现计划
+└── scripts/                   # 发布打包辅助脚本
 ```
 
 ---
@@ -195,10 +231,6 @@ vibe-lamp/
 - **守护进程**:Python(仅标准库,零第三方依赖),macOS launchd 自启。
 - **固件**:PlatformIO + Arduino-ESP32(core 2.0.17)、FastLED、ArduinoJson、WiFiManager。
 - **寻址**:按设备分名的 mDNS `vibelamp-<id>.local`(带 MAC 后 6 位十六进制后缀,多人同网不撞名)。守护进程主要靠局域网扫描(`/api/discover`)找灯,以 `lamp_id` + `lamp_mac` 为稳定身份;mDNS/IP 变了也能自动重绑。
-
-设计文档:[superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
-
----
 
 ## 许可证
 

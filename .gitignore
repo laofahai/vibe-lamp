@@ -5,6 +5,8 @@
 .vscode/
 .idea/
 .serena/
+.superpowers/
+logs/
 
 # Python（转译器，语言待定）
 __pycache__/
@@ -29,6 +31,7 @@ wifi_credentials.*
 *.kicad_prl
 *.lck
 ~*.lck
+*.rpt
 *-backups/
 .history/
 fp-info-cache

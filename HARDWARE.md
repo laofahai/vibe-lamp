@@ -1,6 +1,6 @@
-# Vibe Lamp · 硬件上手指南（今晚照着做）
+# Vibe Lamp · 硬件上手指南
 
-这是一份「从零到灯随会话变色」的分步清单。每一步都有确切命令和预期现象，按顺序做完即可。
+这是一份「从硬件到灯随会话变色」的分步清单。Core V1 PCBA 是推荐路径；面包板原型保留给快速验证和固件调试。
 
 > 命令里的 `pio` / `python` 可直接用仓库自带虚拟环境：
 > - `/Users/laofahai/Documents/workspace/vibe-lamp/.venv/bin/pio`
@@ -12,7 +12,25 @@
 
 ## 0. 你需要什么
 
-打样只要一颗 RGB LED 就能跑通完整的色彩与动效模型；想要多会话分段显示再上 WS2812 灯环。两条路任选其一往下走。
+两条路任选其一往下走：
+
+- **Core V1 PCBA（推荐）**：使用本仓库 KiCad 工程和 `fab/` 里的 JLCPCB 文件下单，收到的是工厂贴好的主控板。用户不需要焊接主板，只需要 USB-C 烧录、配网、装外壳。
+- **面包板原型**：用 ESP32 开发板、RGB LED 或 WS2812 灯环快速验证固件和灯效。
+
+Core V1 生产资料：
+
+| 文件 | 用途 |
+|---|---|
+| `hardware/kicad/vibe_lamp_core_v1/vibe_lamp_core_v1.kicad_pcb` | KiCad PCB 源文件 |
+| `hardware/kicad/vibe_lamp_core_v1/renders/` | PCB 3D 渲染图 |
+| `hardware/kicad/vibe_lamp_core_v1/fab/vibe_lamp_core_v1-gerber.zip` | JLCPCB Gerber 上传包 |
+| `hardware/kicad/vibe_lamp_core_v1/fab/vibe_lamp_core_v1-bom.csv` | JLCPCB 贴片 BOM |
+| `hardware/kicad/vibe_lamp_core_v1/fab/vibe_lamp_core_v1-cpl.csv` | JLCPCB 贴片坐标 |
+| `hardware/v1_routing_status.md` | 布线、DRC、下单注意事项 |
+
+<p align="center">
+  <img src="hardware/kicad/vibe_lamp_core_v1/renders/vibe_lamp_core_v1-iso.png" alt="Vibe Lamp Core V1 PCB 3D render" width="680">
+</p>
 
 ### 物料清单 A — 打样版（单颗共阴 RGB LED）
 
@@ -41,6 +59,20 @@
 ---
 
 ## 1. 接线
+
+### 1. Core V1 PCBA（推荐）
+
+Core V1 的 ESP32-C3-MINI-1、USB-C、WS2812B、清网按钮、电阻电容都在工厂贴片完成。主板本身不需要用户接线。
+
+连接关系见 `hardware/v1_wiring_diagram.svg`：
+
+- USB-C 输入 5V，板上 LDO 输出 3.3V 给 ESP32-C3。
+- 板载 D1 是 WS2812B 数字灯，`GPIO4 → R4(330Ω) → D1.DIN`。
+- D1 的供电经过 D3 形成 `LED5V`，降低 WS2812B 输入高电平门槛，让 ESP32-C3 的 3.3V GPIO 稳定驱动。
+- SW1 清网按钮接 `GPIO10` 到 GND，固件内部上拉。
+- P1 预留外接 WS2812 灯环/灯带焊盘（5V、DATA、GND），D1 是链上第一颗。
+
+如果只使用 Core V1 板载单灯，到这里就可以直接跳到第 2 节烧录。
 
 ### 1A. 共阴 RGB LED（打样版）
 
@@ -91,7 +123,16 @@ config.h 实际数据脚：`PIN_WS2812=4`，`NUM_LEDS=16`。
 
 ## 2. 烧录固件
 
-插上 USB，进 firmware 目录烧录。**打样版**（单颗 RGB LED，默认 env）：
+插上 USB，进 firmware 目录烧录。
+
+**Core V1 PCBA（板载 WS2812B，推荐）**：
+
+```bash
+cd firmware
+pio run -e c3_core_v1 -t upload
+```
+
+**面包板打样版**（单颗 RGB LED，默认 env）：
 
 ```bash
 cd firmware
@@ -240,7 +281,7 @@ http://vibelamp.local/
 
 ### 连不上 WiFi / 想重新配网
 - 设备始终连不上、或换了路由器：让它重进配网门户，两种办法任选：
-  - **开机长按按钮**：断电 → 按住板载 **BOOT 键**（GPIO0）→ 上电并保持约 **3 秒** → 串口打印「重置 WiFi 凭据」并重启 → 重新出现 `VibeLamp-Setup-<后缀>` 热点，按第 3 节重配一次。
+  - **开机长按按钮**：Core V1 按住板上 **SW1 清网键**（GPIO10）；部分开发板原型可按住 **BOOT 键**（GPIO0，取决于你的接线/固件配置）。断电 → 按住按钮 → 上电并保持约 **3 秒** → 串口打印「重置 WiFi 凭据」并重启 → 重新出现 `VibeLamp-Setup-<后缀>` 热点，按第 3 节重配一次。
   - **HTTP 软触发**（设备还在线时）：执行
     ```bash
     curl -X POST http://vibelamp.local/reset
@@ -252,6 +293,7 @@ http://vibelamp.local/
 - **串口先看**：`pio device monitor`，确认有没有 `WiFi OK` 和 `IP`。没连上 WiFi 自然收不到推送。
 - `ping vibelamp-<后缀>.local`（或串口里的 IP）不通 → mDNS 没起来或没连网，回到第 3 节重配网。
 - `curl .../state` 返回了但灯不动：
+  - Core V1：确认烧的是 `c3_core_v1` env；如果误刷 `esp32` / `c3_rgb`，固件会按三路 PWM RGB LED 驱动，不会点亮板载 WS2812B。
   - RGB LED 版：确认是**共阴**且公共脚接 GND（共阳要在驱动里反相）；R/G/B 三脚和 GPIO25/26/27 没接错、限流电阻没虚接。
   - 灯环版：确认数据线接的是 **DIN**（不是 DOUT）、方向箭头对、5V/GND 没接反、电容极性没接反。
 - 灯一直**琥珀慢呼吸** = 失联态，说明 30 秒内没收到 `/state`：守护进程没在推（见下）或网络断了。
@@ -274,6 +316,6 @@ http://vibelamp.local/
 
 ## 8. 换网 / 搬家
 
-**灯要换 WiFi**：不用重烧、不用拆机。按上面「重新配网」的**开机长按 BOOT 键 3 秒**或 `curl -X POST http://vibelamp-<后缀>.local/reset`（占位符换成实际设备名或 IP），清掉旧凭据重进 `VibeLamp-Setup-<后缀>` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。
+**灯要换 WiFi**：不用重烧、不用拆机。按上面「重新配网」的**开机长按清网键约 3 秒**或 `curl -X POST http://vibelamp-<后缀>.local/reset`（占位符换成实际设备名或 IP），清掉旧凭据重进 `VibeLamp-Setup-<后缀>` 配网门户，配一次新 WiFi 即可。日常运行永远不用再插线。
 
 **你的 Mac 换 WiFi**：随时切，无需任何操作。守护进程推送失败会自动按 `lamp_id`/`lamp_mac` 重扫新子网把灯找回并更新地址；弱信号偶发整轮扫空时最多自动重扫 3 轮，掉个包补一轮就抓回来。

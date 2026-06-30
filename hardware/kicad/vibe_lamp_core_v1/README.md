@@ -1,22 +1,34 @@
-# vibe_lamp_core_v1 (KiCad)
+# Vibe Lamp Core V1 (KiCad)
 
-Core V1 桌面状态灯主控板的 KiCad 工程目录（**当前为空，工程尚未开始画**）。
+Core V1 桌面状态灯主控板的 KiCad 工程目录。当前版本已经包含 PCB 源文件、渲染图、JLCPCB Gerber/BOM/CPL 输出，可作为 PCBA 打样下单基础。
 
-28×28mm 圆角方板 · 2 层 · 1.0/1.2mm · ESP32-C3-MINI-1（自带 PCB 天线，需天线 keep-out）· USB-C 供电+原生 USB · 板载 3.3V LDO · 中心单颗共阴 RGB LED · WS2812 扩展焊盘（V1 不装）· 工厂贴片，用户不焊接。
+40×40mm 圆角方板 · 2 层 · ESP32-C3-MINI-1（自带 PCB 天线，天线 keep-out 在位）· USB-C 供电+原生 USB · 板载 3.3V LDO · 板载 WS2812B 状态灯 · WS2812 扩展焊盘 · 清网按钮 · 工厂贴片，用户不焊接主板。
 
-## 从哪开始
-1. 先读 `../../v1_design_review.md`，把其中 §10 的 8 个定稿问题答完（LDO 型号、RGB LED 料号/脚序、限流阻值、R4/ESD/保险丝是否贴、固件按钮脚、USB-C 脚数、表面处理）。
-2. 然后按 `../../v1_kicad_build_guide.md` 一步步在 KiCad GUI 里建工程、录原理图（含完整网表）、指派封装、画 28×28 板框、布局布线（守天线 keep-out）、DRC，最后出 Gerber + BOM + CPL 送 JLCPCB SMT。
+## 当前状态
 
-## 输入文档（画板依据，勿改）
-- `../../v1_spec.md` — 规格
-- `../../v1_schematic.md` — 连接表（网表来源）
-- `../../v1_bom.csv` — BOM
-- `../../v1_pcb_constraints.md` — 生产/布局约束
-- `../../v1_design_review.md` — 设计评审（先看）
-- `../../v1_kicad_build_guide.md` — 画板手册
+- 电气完整：0 短路、0 未连接。
+- 生产资料已生成：`fab/vibe_lamp_core_v1-gerber.zip`、`fab/vibe_lamp_core_v1-bom.csv`、`fab/vibe_lamp_core_v1-cpl.csv`。
+- 3D 预览图在 `renders/`。
+- 详细布线/DRC 说明见 `../../v1_routing_status.md`。
+
+## 目录内容
+
+| 路径 | 用途 |
+|---|---|
+| `vibe_lamp_core_v1.kicad_pcb` | PCB 源文件 |
+| `vibe_lamp_core_v1.kicad_pro` | KiCad 工程配置 |
+| `libs/` | 本工程使用的符号、封装、3D 模型 |
+| `scripts/` | 生成/布线/导出辅助脚本 |
+| `renders/` | 顶视与等轴测 3D 渲染图 |
+| `fab/` | JLCPCB 下单文件 |
+
+## 下单入口
+
+1. 先读 `../../v1_routing_status.md`，确认剩余 DRC 告警的性质。
+2. JLCPCB 下单时上传 `fab/vibe_lamp_core_v1-gerber.zip`。
+3. 选择 PCBA 后上传 `fab/vibe_lamp_core_v1-bom.csv` 与 `fab/vibe_lamp_core_v1-cpl.csv`。
+4. 被动件按阻值/容值在 JLCPCB 页面确认基础库匹配。
 
 ## 注意
-- 不要手写 `.kicad_sch` / `.kicad_pcb`，全部在 GUI 里做。
 - 天线 keep-out 是本板第一约束：模组天线端贴板边，该区域两层禁铜/禁走线/禁过孔/禁器件。
-- 另一目录 `../vibe_lamp_edge_v1/` 是 38×16mm 的**另一种形态草稿**，不是本板，仅供风格参考。
+- 下单/编辑前留意 KiCad 自动回写 `.kicad_pro` 的问题，详见 `../../v1_routing_status.md`。

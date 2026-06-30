@@ -9,6 +9,12 @@
 
 > **But it does NOT depend on, nor require, Vibe Island.** Vibe Lamp reads each agent's own hooks directly (Claude Code `~/.claude/settings.json`, Codex `~/.codex/hooks.json`) to get state — it is an independent "hook consumer," just like Vibe Island. The two can coexist (hooks run side by side), or you can install just one.
 
+<p align="center">
+  <img src="hardware/kicad/vibe_lamp_core_v1/renders/vibe_lamp_core_v1-iso.png" alt="Vibe Lamp Core V1 PCB 3D render" width="680">
+</p>
+
+Core V1 is a complete desk-lamp controller board: ESP32-C3, USB-C power/programming, a board-mounted WS2812B status LED, reset/provisioning button, and an expansion pad for an external LED ring or strip. The KiCad project includes PCB source, 3D renders, JLCPCB Gerber, BOM, and CPL outputs.
+
 ---
 
 ## What it solves
@@ -87,19 +93,47 @@ else all idle            → ⚫ dim
 
 ---
 
-## Hardware list
+## Hardware
 
-A single RGB LED is enough to validate the full color and animation model; add a WS2812 ring later for multi-session segmented display.
+There are two supported hardware paths:
 
-| Part | Prototype (minimal) | Finished build (optional upgrade) |
+1. **Core V1 PCBA** — the finished board in this repository. This is the recommended project build: order the generated fabrication files, flash firmware, provision WiFi, and put it in a diffuser/enclosure.
+2. **Breadboard prototype** — useful for firmware bring-up or quick experiments with an ESP32 dev board plus a single RGB LED or WS2812 ring.
+
+<p align="center">
+  <img src="hardware/kicad/vibe_lamp_core_v1/renders/vibe_lamp_core_v1-top.png" alt="Vibe Lamp Core V1 PCB top render" width="520">
+</p>
+
+| Part | Breadboard prototype | Core V1 PCBA |
 |---|---|---|
-| MCU | The ESP32 dev board you already have | ESP32-C3 SuperMini / XIAO ESP32-C3 (smaller, cheaper, zero feature difference) |
-| Display | A single **common-cathode RGB LED** (3 PWM channels) | WS2812 ring (16 LEDs) |
-| Parts | Breadboard, jumper wires, 3 × ~220Ω current-limit resistors | ~330Ω resistor in series on the WS2812 data line, ~1000µF cap across power |
-| Diffusion | None (bare LED is fine) | Milky acrylic diffuser / white PLA 3D-printed enclosure |
+| MCU | ESP32 dev board / ESP32-C3 board | ESP32-C3-MINI-1 module |
+| Display | Single RGB LED or WS2812 ring | Board-mounted WS2812B LED, external WS2812 pad reserved |
+| Assembly | Breadboard, jumper wires, resistors | Factory SMT PCBA; no user soldering for the main board |
+| Production files | Not needed | KiCad source + `fab/` Gerber/BOM/CPL |
 | Power | USB | USB |
 
-> For detailed wiring, pinout, flashing, WiFi setup, and a light-up self-test, see **[HARDWARE.md](HARDWARE.md)**.
+Breadboard prototype parts:
+
+| Part | Qty | Notes |
+|---|---:|---|
+| ESP32 dev board | 1 | Any `esp32dev`-compatible board is enough for the original RGB prototype |
+| Common-cathode RGB LED | 1 | 4-pin LED: common cathode plus R/G/B pins |
+| 220 ohm resistor | 3 | One current-limit resistor per R/G/B channel |
+| Breadboard | 1 | For quick bring-up |
+| Jumper wires | Several | Male-male or whatever matches your board |
+| USB data cable | 1 | Power and flashing |
+
+WS2812 ring prototype parts:
+
+| Part | Qty | Notes |
+|---|---:|---|
+| ESP32 dev board | 1 | Same firmware stack, different display env |
+| WS2812 / WS2812B ring | 1 | 16 LEDs is the default test target |
+| 330 ohm resistor | 1 | In series with DIN |
+| 1000 uF electrolytic capacitor | 1 | Across 5V and GND, mind polarity |
+| Jumper wires + USB data cable | Several | Power, data, flashing |
+
+For wiring diagrams, Core V1 production notes, flashing, WiFi setup, and a light-up self-test, see **[HARDWARE.md](HARDWARE.md)**.
 
 ---
 
@@ -107,8 +141,8 @@ A single RGB LED is enough to validate the full color and animation model; add a
 
 Follow **[HARDWARE.md](HARDWARE.md)** end to end and the lamp will track real sessions tonight. Roughly:
 
-1. Wire it up (single RGB LED, or a WS2812 ring).
-2. Flash the firmware: `cd firmware && pio run -e esp32 -t upload`.
+1. Use Core V1 PCBA, or wire the breadboard RGB / WS2812 prototype.
+2. Flash the firmware: `cd firmware && pio run -e c3_core_v1 -t upload` for Core V1, or `pio run -e esp32 -t upload` for the original ESP32 RGB prototype.
 3. WiFi setup: connect your phone to the `VibeLamp-Setup-<id>` hotspot (each lamp's AP and mDNS name carry a 6-hex suffix from its MAC) → the captive portal pops up → enter your home WiFi password.
 4. Manual light-up self-test (use the lamp's per-device name `vibelamp-<id>.local`, shown on the portal, or its IP): `curl -X POST http://vibelamp-<id>.local/state -d '{"sessions":[{"state":"working","tool":"code"}]}'`.
 5. Hook into real sessions: `cd daemon && python install.py install`, then run a task in Claude Code / Codex and watch the lamp.
@@ -135,7 +169,10 @@ cd firmware
 # Run the render-engine pure-logic unit tests (14, no board needed)
 pio test -e native
 
-# Build the on-board firmware (single RGB LED version)
+# Build the Core V1 board firmware
+pio run -e c3_core_v1
+
+# Build the original single RGB LED prototype firmware
 pio run -e esp32
 
 # Build the ring version
@@ -151,14 +188,14 @@ pio run -e esp32 -t upload && pio device monitor
 
 ## Project status / roadmap
 
-The design doc + 5 implementation plans are complete and public. Current progress:
+Current progress:
 
 **Done**
-- ✅ Design doc (three-layer architecture, state model, display-driver abstraction, disconnection handling, custom settings).
 - ✅ ESP32 firmware: networking + per-device mDNS (`vibelamp-<id>.local`), HTTP `/state` `/health`, watchdog lost-detection, four display-hardware abstractions, multi-session segmentation, the full set of state animations, boot animation. **All 14 native tests green; `esp32` / `esp32_ring` / `esp32_ble` all compile.**
 - ✅ Python daemon: session merge, heartbeat, timeout fallback, push retry, auto-rediscovery (on push failure it re-scans the LAN by `lamp_id`/`lamp_mac`, so the lamp is re-found after an IP change or after you switch WiFi networks), launchd autostart; Claude Code + Codex hook integration (Codex included). **All 57 pytest green.**
 - ✅ WiFi provisioning + multi-network connect: a self-managed multi-network credential table in NVS is the single source of truth; on boot the firmware scans nearby APs and connects to the strongest known network (mesh-aware: handles one SSID spread across multiple BSSIDs, relaxes min security for WPA-only APs, retries across rounds). WiFiManager only serves the captive-portal UI (`VibeLamp-Setup-<id>` hotspot, configure in browser, credentials survive power loss).
 - ✅ User customization: the lamp's own settings page (brightness / color / animation, stored in NVS, at `http://vibelamp-<id>.local/`) + daemon config file `~/.vibelamp/config.json`.
+- ✅ Core V1 hardware: KiCad board source, 3D renders, JLCPCB Gerber/BOM/CPL outputs, and routing/DRC status are included under `hardware/kicad/vibe_lamp_core_v1/`.
 
 **To do (v1.1+)**
 - ⏳ **Plan 04 — BLE**: fall back to BLE push when WiFi drops (dual-channel redundancy) + Espressif official-app BLE provisioning.
@@ -174,8 +211,9 @@ vibe-lamp/
 ├── README.md                  # English (GitHub homepage)
 ├── README.zh-CN.md            # Chinese
 ├── HARDWARE.md                # The hardware getting-started guide to follow tonight
+├── hardware/                  # Core V1 specs, wiring diagram, KiCad source, fab outputs
 ├── firmware/                  # ESP32 firmware (PlatformIO)
-│   ├── platformio.ini         #   envs: esp32 / esp32_ring / esp32_ble / native
+│   ├── platformio.ini         #   envs: c3_core_v1 / esp32 / esp32_ring / esp32_ble / native
 │   ├── include/config.h       #   pins, LED count, timeout, mDNS name, brightness cap
 │   ├── src/                   #   render engine + display driver + networking + HTTP API
 │   └── test/                  #   render-engine native unit tests
@@ -183,9 +221,7 @@ vibe-lamp/
 │   ├── install.py             #   idempotent hook install + launchd + Codex config
 │   ├── vibelamp/              #   server, session merge, lamp push client, config
 │   └── tests/                 #   pytest
-└── superpowers/               # design doc & implementation plans
-    ├── specs/                 #   overall design
-    └── plans/                 #   5 implementation plans
+└── scripts/                   # release packaging helpers
 ```
 
 ---
@@ -195,10 +231,6 @@ vibe-lamp/
 - **Daemon**: Python (stdlib only, zero third-party deps), macOS launchd autostart.
 - **Firmware**: PlatformIO + Arduino-ESP32 (core 2.0.17), FastLED, ArduinoJson, WiFiManager.
 - **Addressing**: per-device mDNS `vibelamp-<id>.local` (a 6-hex MAC suffix avoids name clashes on shared networks). The daemon's primary way to find the lamp is a LAN scan (`/api/discover`), keyed on `lamp_id` + `lamp_mac` as the stable identity, so mDNS/IP can change and it re-binds automatically.
-
-Design doc: [superpowers/specs/2026-06-13-vibe-lamp-design.md](superpowers/specs/2026-06-13-vibe-lamp-design.md)
-
----
 
 ## License
 
